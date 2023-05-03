@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net6.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<GeneratePackageOnBuild>False</GeneratePackageOnBuild>
+		<IsPublishable>True</IsPublishable>
+		<PackageId>$(AssemblyName)</PackageId>
+		<Version>1.0.0-alpha1</Version>
+		<Company>None</Company>
+		<Authors>benoit_hoffman</Authors>
+		<Description>
+			Library for mediator with command pattern. Except that every command can hold sub commands, and a command, or a set of commands can be undone all at once.
+		</Description>
+		<RepositoryUrl>https://github.com/Petit-Pas/undoable-mediator</RepositoryUrl>
+		<InvariantGlobalization>true</InvariantGlobalization>
+	</PropertyGroup>
+
+</Project>
