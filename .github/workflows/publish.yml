@@ -1,0 +1,33 @@
+name: .NET
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v2
+      with:
+        dotnet-version: 6.0.x
+#    - name: Restore workloads
+#      run: dotnet workload restore  
+    - name: Restore dependencies
+      run: dotnet restore ./undoable-mediator/src/undoable-mediator.csproj
+    - name: Build
+      run: dotnet build ./undoable-mediator/src/undoable-mediator.csproj --no-restore
+#    - name: Test
+#      run: dotnet test --no-build --verbosity normal
+
+
+    - name: Package
+      run: dotnet pack -c Release -o . undoable-mediator/src/undoable-mediator.csproj
+    - name: Publish 
+      run: dotnet nuget push *.nupkg -k ${{ secrets.NUGET_KEY }} -s https://api.nuget.org/v3/index.json --skip-duplicate
