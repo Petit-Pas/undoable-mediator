@@ -21,14 +21,14 @@ jobs:
 #    - name: Restore workloads
 #      run: dotnet workload restore  
     - name: Restore dependencies
-      run: dotnet restore src/UndoableMediator.csproj
+      run: dotnet restore src/UndoableMediator/UndoableMediator.csproj
     - name: Build
-      run: dotnet build src/UndoableMediator.csproj --no-restore
+      run: dotnet build src/UndoableMediator/UndoableMediator.csproj --no-restore
 #    - name: Test
 #      run: dotnet test --no-build --verbosity normal
 
 
     - name: Package
-      run: dotnet pack -c Release -o . src/UndoableMediator.csproj
+      run: dotnet pack -c Release -o . src/UndoableMediator/UndoableMediator.csproj
     - name: Publish 
       run: dotnet nuget push *.nupkg -k ${{ secrets.NUGET_KEY }} -s https://api.nuget.org/v3/index.json --skip-duplicate
