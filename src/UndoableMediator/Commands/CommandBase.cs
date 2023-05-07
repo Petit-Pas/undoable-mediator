@@ -2,7 +2,7 @@
 
 namespace UndoableMediator.Commands;
 
-public class CommandBase : ICommand
+public abstract class CommandBase : ICommand
 {
     public void ExecuteBy(IUndoableMediator mediator, bool addToHistory = false)
     {

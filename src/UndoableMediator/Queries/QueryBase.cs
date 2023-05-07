@@ -2,7 +2,7 @@
 
 namespace UndoableMediator.Queries;
 
-public class QueryBase<T> : IQuery
+public abstract class QueryBase<T> : IQuery
 {
     public QueryResponse<T>? ExecuteBy(IUndoableMediator mediator)
     {

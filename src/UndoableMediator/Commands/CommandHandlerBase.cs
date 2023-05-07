@@ -2,7 +2,7 @@
 
 namespace UndoableMediator.Commands;
 
-public class CommandHandlerBase<T> : ICommandHandler<T>
+public abstract class CommandHandlerBase<T> : ICommandHandler<T>
     where T : ICommand
 {
     /// <summary>
@@ -22,4 +22,6 @@ public class CommandHandlerBase<T> : ICommandHandler<T>
             mediator.Undo(subCommand);
         }
     }
+
+    public abstract CommandResponse Execute(T command, IUndoableMediator mediator);
 }

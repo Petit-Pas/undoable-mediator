@@ -2,5 +2,6 @@
 
 public interface IQueryResponse<T>
 {
-    T? Response { get; set; }
+    T? Response { get; }
+    bool WasCanceled { get; }
 }

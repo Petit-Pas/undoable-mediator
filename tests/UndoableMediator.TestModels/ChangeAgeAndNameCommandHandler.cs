@@ -1,10 +1,11 @@
-﻿using UndoableMediator.Mediators;
+﻿using UndoableMediator.Commands;
+using UndoableMediator.Mediators;
 
 namespace UndoableMediator.TestModels;
 
-public class ChangeAgeAndNameCommandHandler
+public class ChangeAgeAndNameCommandHandler : CommandHandlerBase<ChangeAgeAndNameCommand>
 {
-    public static void Execute(ChangeAgeAndNameCommand command, IUndoableMediator mediator)
+    public override CommandResponse Execute(ChangeAgeAndNameCommand command, IUndoableMediator mediator)
     {
         var changeAgeCmd = new ChangeAgeCommand(command.Age);
         var changeNameCmd = new ChangeNameCommand(command.Name);
@@ -14,5 +15,7 @@ public class ChangeAgeAndNameCommandHandler
 
         changeNameCmd.ExecuteBy(mediator);
         command.AddToSubCommands(changeNameCmd);
+
+        return CommandResponse.Success;
     }
 }

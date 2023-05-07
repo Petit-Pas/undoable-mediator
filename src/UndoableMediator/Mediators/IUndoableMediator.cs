@@ -5,7 +5,7 @@ namespace UndoableMediator.Mediators;
 
 public interface IUndoableMediator
 {
-    void Execute(ICommand command, bool AddToHistory = false);
+    void Execute(ICommand command, bool addToHistory = false);
 
     IQueryResponse<T> Execute<T>(IQuery query);
 
