@@ -7,8 +7,8 @@ namespace UndoableMediator.Mediators;
 
 public class UndoableMediator : IUndoableMediator
 {
-    private readonly Dictionary<Type, Type?> _commandHandlers = new ();
-    private readonly Dictionary<Type, Type?> _queryHandlers = new ();
+    private readonly Dictionary<Type, ICommandHandler?> _commandHandlers = new ();
+    private readonly Dictionary<Type, IQueryHandler?> _queryHandlers = new ();
 
     /// <summary>
     ///     if a keyword list is provided, UndoableMediator will only be looking for requests and handlers in assemblies that contain one of those keywords
@@ -36,6 +36,8 @@ public class UndoableMediator : IUndoableMediator
             {
                 foreach (var implementationType in assembly.GetTypes())
                 {
+                    var name = implementationType.FullName;
+                    ;
                     if (!implementationType.GetTypeInfo().IsAbstract)
                     {
                         foreach (var interfaceType in implementationType.GetInterfaces())
@@ -53,6 +55,12 @@ public class UndoableMediator : IUndoableMediator
                             else if (interfaceType.IsGenericType && interfaceType.GetGenericTypeDefinition() == typeof(ICommandHandler<>))
                             {
                                 var commandType = interfaceType.GetGenericArguments().Single();
+                                Console.WriteLine($"INFO : MediatorBase found the '{implementationType.FullName}' command handler to handle {commandType.FullName}.");
+                                RegisterCommandHandler(implementationType, commandType);
+                            }
+                            else if (interfaceType.IsGenericType && interfaceType.GetGenericTypeDefinition() == typeof(ICommandHandler<,>))
+                            {
+                                var commandType = interfaceType.GetGenericArguments().First();
                                 Console.WriteLine($"INFO : MediatorBase found the '{implementationType.FullName}' command handler to handle {commandType.FullName}.");
                                 RegisterCommandHandler(implementationType, commandType);
                             }
@@ -103,11 +111,11 @@ public class UndoableMediator : IUndoableMediator
         {
             if (registeredHandler != null)
             {
-                Console.WriteLine($"WARNING : will override command handler {registeredHandler.FullName} with {commandHandlerType.FullName} " +
+                Console.WriteLine($"WARNING : will override command handler {registeredHandler.GetType().FullName} with {commandHandlerType.FullName} " +
                                   $"as the handler for {commandType.FullName} since a new value was found by UndoableMediator");
             }
         }
-        _commandHandlers[commandType] = commandHandlerType;
+        _commandHandlers[commandType] = Activator.CreateInstance(commandHandlerType) as ICommandHandler;
     }
 
     private void RegisterQueryHandler(Type queryHandlerType, Type queryType)
@@ -116,22 +124,45 @@ public class UndoableMediator : IUndoableMediator
         {
             if (registeredHandler != null)
             {
-                Console.WriteLine($"WARNING : will override query handler {registeredHandler.FullName} with {queryHandlerType.FullName} " +
+                Console.WriteLine($"WARNING : will override query handler {registeredHandler.GetType().FullName} with {queryHandlerType.FullName} " +
                                   $"as the handler for {queryType.FullName} since a new value was found by UndoableMediator");
             }
         }
-        _queryHandlers[queryType] = queryHandlerType;
+        _queryHandlers[queryType] = Activator.CreateInstance(queryHandlerType) as IQueryHandler;
     }
 
     
     public void Execute(ICommand command, bool addToHistory = false)
     {
-        throw new NotImplementedException();
+        if (_commandHandlers.TryGetValue(command.GetType(), out var handler) && handler != null)
+        {
+            handler.Execute(command, this);
+        }
+        else
+        {
+            throw new NullReferenceException($"ERROR : Missing command handler for {command.GetType().FullName}.");
+        }
     }
 
-    public IQueryResponse<T> Execute<T>(IQuery query)
+    public CommandResponse<TResponse>? Execute<TResponse>(ICommand<TResponse> command, bool addToHistory = false)
     {
-        throw new NotImplementedException();
+        if (_commandHandlers.TryGetValue(command.GetType(), out var handler) && handler != null)
+        {
+            return handler.Execute(command, this) as CommandResponse<TResponse>;
+        }
+        else
+        {
+            throw new NullReferenceException($"ERROR : Missing command handler for {command.GetType().FullName}.");
+        }
+    }
+
+    public IQueryResponse<T>? Execute<T>(IQuery<T> query)
+    {
+        if (_queryHandlers.TryGetValue(query.GetType(), out var handler) && handler != null)
+        {
+            return handler.Execute(query) as IQueryResponse<T>;
+        }
+        throw new NullReferenceException($"ERROR : Missing command handler for {query.GetType().FullName}.");
     }
 
     public void Undo(ICommand command)

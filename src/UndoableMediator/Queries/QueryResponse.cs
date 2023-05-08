@@ -1,25 +1,31 @@
 ﻿using System.Diagnostics;
+using UndoableMediator.Requests;
 
 namespace UndoableMediator.Queries;
 
 public class QueryResponse<T> : IQueryResponse<T>
 {
-    private QueryResponse(T response, bool canceled)
+    private QueryResponse(T response, RequestStatus status)
     {
         Response = response;
-        WasCanceled = canceled;
+        Status = status;
     }
 
     public static QueryResponse<T> Canceled(T response)
     {
-		return new QueryResponse<T>(response, true);
+		return new QueryResponse<T>(response, RequestStatus.Canceled);
     }
 
     public static QueryResponse<T> Success(T response)
     {
-        return new QueryResponse<T>(response, false);
+        return new QueryResponse<T>(response, RequestStatus.Success);
+    }
+
+    public static QueryResponse<T> Failed(T response)
+    {
+        return new QueryResponse<T>(response, RequestStatus.Failed);
     }
 
     public T? Response { get; }
-	public bool WasCanceled { get; }
+	public RequestStatus Status { get; }
 }

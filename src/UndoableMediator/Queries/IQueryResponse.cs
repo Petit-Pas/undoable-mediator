@@ -1,7 +1,13 @@
-﻿namespace UndoableMediator.Queries;
+﻿using UndoableMediator.Requests;
 
-public interface IQueryResponse<T>
+namespace UndoableMediator.Queries;
+
+public interface IQueryResponse<T> : IQueryResponse
 {
     T? Response { get; }
-    bool WasCanceled { get; }
+}
+
+public interface IQueryResponse
+{
+    RequestStatus Status { get; }
 }

@@ -10,7 +10,7 @@ public class ChangeAgeCommandHandler : CommandHandlerBase<ChangeAgeCommand>
         command.OldAge = AffectedObject.Age;
         AffectedObject.Age = command.NewAge;
 
-        return CommandResponse.Success;
+        return CommandResponse.Success();
     }
 
     public override void Undo(ChangeAgeCommand command, IUndoableMediator mediator)

@@ -1,6 +1,12 @@
 ﻿namespace UndoableMediator.Queries;
 
-public interface IQueryHandler<TQuery, TResponse>
+public interface IQueryHandler<TQuery, TResponse> : IQueryHandler
+    where TQuery : IQuery<TResponse>
 {
-    public IQueryResponse<TResponse> Execute(TQuery query);
+    IQueryResponse<TResponse> Execute(TQuery query);
+}
+
+public interface IQueryHandler
+{
+    IQueryResponse Execute(IQuery query);
 }

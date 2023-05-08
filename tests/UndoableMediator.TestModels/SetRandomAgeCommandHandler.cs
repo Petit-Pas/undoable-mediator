@@ -3,16 +3,16 @@ using UndoableMediator.Mediators;
 
 namespace UndoableMediator.TestModels;
 
-public class SetRandomAgeCommandHandler : CommandHandlerBase<SetRandomAgeCommand>
+public class SetRandomAgeCommandHandler : CommandHandlerBase<SetRandomAgeCommand, int>
 {
-    public override CommandResponse Execute(SetRandomAgeCommand command, IUndoableMediator mediator)
+    public override CommandResponse<int> Execute(SetRandomAgeCommand command, IUndoableMediator mediator)
     {
         var randomAgeQuery = new RandomIntQuery();
-        var age = randomAgeQuery.ExecuteBy(mediator);
+        var age = mediator.Execute(randomAgeQuery);
         var changeAgeCommand = new ChangeAgeCommand(age?.Response ?? 0);
         mediator.Execute(changeAgeCommand);
         command.AddToSubCommands(changeAgeCommand);
 
-        return CommandResponse.Success;
+        return CommandResponse<int>.Success(age?.Response ?? 0);
     }
 }

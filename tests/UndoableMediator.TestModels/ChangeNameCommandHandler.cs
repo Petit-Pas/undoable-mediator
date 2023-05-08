@@ -10,7 +10,7 @@ public class ChangeNameCommandHandler : CommandHandlerBase<ChangeNameCommand>
         command.OldName = AffectedObject.Name;
         AffectedObject.Name = command.NewName;
 
-        return CommandResponse.Success;
+        return CommandResponse.Success();
     }
     
     public override void Undo(ChangeNameCommand command, IUndoableMediator mediator)

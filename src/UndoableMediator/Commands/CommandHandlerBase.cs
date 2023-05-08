@@ -2,8 +2,8 @@
 
 namespace UndoableMediator.Commands;
 
-public abstract class CommandHandlerBase<T> : ICommandHandler<T>
-    where T : ICommand
+public abstract class CommonCommandHandlerBase<TCommand>
+    where TCommand : ICommand
 {
     /// <summary>
     ///     Override this method when you command handler actually modifies anything. 
@@ -14,7 +14,7 @@ public abstract class CommandHandlerBase<T> : ICommandHandler<T>
     /// </summary>
     /// <param name="command"></param>
     /// <param name="mediator"></param>
-    public virtual void Undo(T command, IUndoableMediator mediator)
+    public virtual void Undo(TCommand command, IUndoableMediator mediator)
     {
         // maybe this can be set in the base class instead
         foreach (var subCommand in command.SubCommands)
@@ -22,6 +22,37 @@ public abstract class CommandHandlerBase<T> : ICommandHandler<T>
             mediator.Undo(subCommand);
         }
     }
-
-    public abstract CommandResponse Execute(T command, IUndoableMediator mediator);
 }
+
+public abstract class CommandHandlerBase<TCommand> : CommonCommandHandlerBase<TCommand>, ICommandHandler<TCommand>
+    where TCommand : class, ICommand
+{
+    public abstract CommandResponse Execute(TCommand command, IUndoableMediator mediator);
+
+    public void Undo(ICommand command, IUndoableMediator mediator)
+    {
+        this.Undo(command as TCommand, mediator);
+    }
+
+    public CommandResponse Execute(ICommand command, IUndoableMediator mediator)
+    {
+        return this.Execute(command as TCommand, mediator);
+    }
+}
+
+public abstract class CommandHandlerBase<TCommand, TResponse> : CommonCommandHandlerBase<TCommand>, ICommandHandler<TCommand, TResponse>
+    where TCommand : class, ICommand<TResponse>
+{
+    public abstract CommandResponse<TResponse> Execute(TCommand command, IUndoableMediator mediator);
+
+    public void Undo(ICommand command, IUndoableMediator mediator)
+    {
+        this.Undo(command as TCommand, mediator);
+    }
+
+    public CommandResponse Execute(ICommand command, IUndoableMediator mediator)
+    {
+        return this.Execute(command as TCommand, mediator);
+    }
+}
+

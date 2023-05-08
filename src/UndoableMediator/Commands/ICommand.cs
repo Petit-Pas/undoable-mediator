@@ -2,6 +2,10 @@
 
 namespace UndoableMediator.Commands;
 
+public interface ICommand<TResponse> : ICommand
+{
+}
+
 public interface ICommand
 {
     /// <summary>
@@ -14,5 +18,5 @@ public interface ICommand
     /// </summary>
     /// <param name="command"></param>
     void AddToSubCommands(CommandBase command);
-    void ExecuteBy(IUndoableMediator mediator, bool addToHistory = false);
 }
+

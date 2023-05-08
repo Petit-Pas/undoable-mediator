@@ -10,12 +10,12 @@ public class ChangeAgeAndNameCommandHandler : CommandHandlerBase<ChangeAgeAndNam
         var changeAgeCmd = new ChangeAgeCommand(command.Age);
         var changeNameCmd = new ChangeNameCommand(command.Name);
 
-        changeAgeCmd.ExecuteBy(mediator);
+        mediator.Execute(changeAgeCmd);
         command.AddToSubCommands(changeAgeCmd);
 
-        changeNameCmd.ExecuteBy(mediator);
+        mediator.Execute(changeNameCmd);
         command.AddToSubCommands(changeNameCmd);
 
-        return CommandResponse.Success;
+        return CommandResponse.Success();
     }
 }

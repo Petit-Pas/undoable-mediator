@@ -4,6 +4,10 @@ namespace UndoableMediator.TestModels;
 
 public class CancelableCommand : CommandBase
 {
+    public CancelableCommand()
+    {
+    }
+
     public bool ShouldBeCanceled { get; }
 
     public CancelableCommand(bool shouldBeCanceled)

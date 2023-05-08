@@ -7,7 +7,7 @@ public interface IUndoableMediator
 {
     void Execute(ICommand command, bool addToHistory = false);
 
-    IQueryResponse<T> Execute<T>(IQuery query);
+    IQueryResponse<T>? Execute<T>(IQuery<T> query);
 
     void Undo(ICommand command);
 }
