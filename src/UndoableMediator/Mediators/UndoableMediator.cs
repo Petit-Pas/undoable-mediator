@@ -138,7 +138,7 @@ public class UndoableMediator : IUndoableMediator
         //{
         //    var handlerInstance = Activator.CreateInstance(commandHandlerType) as ICommandHandler;
         //    var command = Activator.CreateInstance(commandType) as ICommand;
-        //    handlerInstance.GenericUndo(command, this);
+        //    handlerInstance.Undo(command, this);
         //}
 
         _commandHandlers[commandType] = Activator.CreateInstance(commandHandlerType) as ICommandHandler;
@@ -228,7 +228,7 @@ public class UndoableMediator : IUndoableMediator
 
         if (_commandHandlers.TryGetValue(command.GetType(), out var genericHandler) && genericHandler != null)
         {
-            genericHandler.GenericUndo(command, this);
+            genericHandler.Undo(command, this);
         }
     }
 

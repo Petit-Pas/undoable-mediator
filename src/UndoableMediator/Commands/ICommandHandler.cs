@@ -18,6 +18,6 @@ public interface ICommandHandler<TCommand, TResponse> : ICommandHandler
 
 public interface ICommandHandler
 {
-    void GenericUndo(ICommand command, IUndoableMediator mediator);
+    void Undo(ICommand command, IUndoableMediator mediator);
     ICommandResponse Execute(ICommand command, IUndoableMediator mediator);
 }

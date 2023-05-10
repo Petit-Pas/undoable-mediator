@@ -11,10 +11,10 @@ var command = new SetRandomAgeCommand();
 
 var testCommand = new ChangeAgeCommand(15);
 //var handler = new ChangeAgeCommandHandler();
-//handler.Undo(testCommand, mediator);
+//handler.UndoSubCommands(testCommand, mediator);
 
 //var genericHandler = new ChangeAgeCommandHandler() as ICommandHandler<ChangeAgeCommand>;
-//genericHandler.Undo(testCommand, mediator);
+//genericHandler.UndoSubCommands(testCommand, mediator);
 
 var result1 = mediator.Execute(command, (_) => true);
 
