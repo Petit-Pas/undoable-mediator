@@ -2,32 +2,32 @@
 
 namespace UndoableMediator.Commands;
 
-public class CommandResponse<T> : CommandResponse
+public class CommandResponse<TResponse> : CommandResponse, ICommandResponse<TResponse>
 {
-    private CommandResponse(T response, RequestStatus status) : base(status)
+    private CommandResponse(TResponse response, RequestStatus status) : base(status)
     {
         Response = response;
     }
 
-    public static CommandResponse<T> Canceled(T response)
+    public static CommandResponse<TResponse> Canceled(TResponse response)
     {
-        return new CommandResponse<T>(response, RequestStatus.Canceled);
+        return new CommandResponse<TResponse>(response, RequestStatus.Canceled);
     }
 
-    public static CommandResponse<T> Success(T response)
+    public static CommandResponse<TResponse> Success(TResponse response)
     {
-        return new CommandResponse<T>(response, RequestStatus.Success);
+        return new CommandResponse<TResponse>(response, RequestStatus.Success);
     }
 
-    public static CommandResponse<T> Failed(T response)
+    public static CommandResponse<TResponse> Failed(TResponse response)
     {
-        return new CommandResponse<T>(response, RequestStatus.Failed);
+        return new CommandResponse<TResponse>(response, RequestStatus.Failed);
     }
 
-    public T? Response { get; }
+    public TResponse? Response { get; }
 }
 
-public class CommandResponse
+public class CommandResponse : ICommandResponse
 {
     internal CommandResponse(RequestStatus status)
     {

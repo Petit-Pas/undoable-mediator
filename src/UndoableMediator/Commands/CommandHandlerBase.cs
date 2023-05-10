@@ -27,14 +27,14 @@ public abstract class CommonCommandHandlerBase<TCommand>
 public abstract class CommandHandlerBase<TCommand> : CommonCommandHandlerBase<TCommand>, ICommandHandler<TCommand>
     where TCommand : class, ICommand
 {
-    public abstract CommandResponse Execute(TCommand command, IUndoableMediator mediator);
+    public abstract ICommandResponse Execute(TCommand command, IUndoableMediator mediator);
 
-    public void Undo(ICommand command, IUndoableMediator mediator)
+    public void GenericUndo(ICommand command, IUndoableMediator mediator)
     {
-        this.Undo(command as TCommand, mediator);
+        Undo(command as TCommand, mediator);
     }
 
-    public CommandResponse Execute(ICommand command, IUndoableMediator mediator)
+    public ICommandResponse Execute(ICommand command, IUndoableMediator mediator)
     {
         return this.Execute(command as TCommand, mediator);
     }
@@ -43,16 +43,16 @@ public abstract class CommandHandlerBase<TCommand> : CommonCommandHandlerBase<TC
 public abstract class CommandHandlerBase<TCommand, TResponse> : CommonCommandHandlerBase<TCommand>, ICommandHandler<TCommand, TResponse>
     where TCommand : class, ICommand<TResponse>
 {
-    public abstract CommandResponse<TResponse> Execute(TCommand command, IUndoableMediator mediator);
+    public abstract ICommandResponse<TResponse> Execute(TCommand command, IUndoableMediator mediator);
 
-    public void Undo(ICommand command, IUndoableMediator mediator)
+    public void GenericUndo(ICommand command, IUndoableMediator mediator)
     {
-        this.Undo(command as TCommand, mediator);
+        Undo(command as TCommand, mediator);
     }
 
-    public CommandResponse Execute(ICommand command, IUndoableMediator mediator)
+    public ICommandResponse Execute(ICommand command, IUndoableMediator mediator)
     {
-        return this.Execute(command as TCommand, mediator);
+        return Execute(command as TCommand, mediator);
     }
 }
 

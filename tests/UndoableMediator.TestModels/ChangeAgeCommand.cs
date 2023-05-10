@@ -9,6 +9,12 @@ public class ChangeAgeCommand : CommandBase
 		NewAge = newAge;
 	}
 
+    public ChangeAgeCommand()
+    {
+		// TODO should be removed, was for testing
+        NewAge = 10;
+    }
+
 	public int NewAge { get; }
 	public int OldAge { get; set; }
 }

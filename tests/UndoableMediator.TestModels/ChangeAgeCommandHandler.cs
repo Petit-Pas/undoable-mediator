@@ -15,6 +15,7 @@ public class ChangeAgeCommandHandler : CommandHandlerBase<ChangeAgeCommand>
 
     public override void Undo(ChangeAgeCommand command, IUndoableMediator mediator)
     {
+        base.Undo(command, mediator);
         AffectedObject.Age = command.OldAge;
     }
 }
