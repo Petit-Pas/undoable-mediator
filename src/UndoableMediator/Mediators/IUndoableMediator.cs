@@ -15,4 +15,7 @@ public interface IUndoableMediator
     void Undo(ICommand command);
 
     void UndoLastCommand();
+
+    public static bool AddAlways(RequestStatus _) => true;
+    public static bool AddNever(RequestStatus _) => false;
 }

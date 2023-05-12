@@ -5,15 +5,20 @@ using UndoableMediator.Requests;
 
 namespace UndoableMediator.Mediators;
 
+// TODO this still needs a sanity check after the ScanAssemblies
+
 public class UndoableMediator : IUndoableMediator
 {
     private readonly Dictionary<Type, ICommandHandler?> _commandHandlers = new();
     private readonly Dictionary<Type, IQueryHandler?> _queryHandlers = new();
 
+    private readonly int _commandHistoryMaxSize;
+    private readonly List<ICommand> _commandHistory;
+
     public UndoableMediator(int maxSize = 64)
     {
-        CommandHistoryMaxSize = maxSize;
-        CommandHistory = new List<ICommand>(maxSize);
+        _commandHistoryMaxSize = maxSize;
+        _commandHistory = new List<ICommand>(maxSize);
     }
 
     /// <summary>
@@ -122,7 +127,7 @@ public class UndoableMediator : IUndoableMediator
         }
     }
 
-    private void RegisterCommandHandler(Type commandHandlerType, Type commandType)
+    internal void RegisterCommandHandler(Type commandHandlerType, Type commandType)
     {
         if (_commandHandlers.TryGetValue(commandType, out var registeredHandler))
         {
@@ -134,17 +139,10 @@ public class UndoableMediator : IUndoableMediator
             }
         }
 
-        //if (commandHandlerType.FullName.Contains("ChangeAgeCommandHandler") && false)
-        //{
-        //    var handlerInstance = Activator.CreateInstance(commandHandlerType) as ICommandHandler;
-        //    var command = Activator.CreateInstance(commandType) as ICommand;
-        //    handlerInstance.Undo(command, this);
-        //}
-
         _commandHandlers[commandType] = Activator.CreateInstance(commandHandlerType) as ICommandHandler;
     }
 
-    private void RegisterQueryHandler(Type queryHandlerType, Type queryType)
+    internal void RegisterQueryHandler(Type queryHandlerType, Type queryType)
     {
         if (_queryHandlers.TryGetValue(queryType, out var registeredHandler))
         {
@@ -158,7 +156,6 @@ public class UndoableMediator : IUndoableMediator
 
         _queryHandlers[queryType] = Activator.CreateInstance(queryHandlerType) as IQueryHandler;
     }
-
 
     public ICommandResponse Execute(ICommand command, Func<RequestStatus, bool>? shouldAddCommandToHistory = null)
     {
@@ -193,17 +190,14 @@ public class UndoableMediator : IUndoableMediator
         throw new NullReferenceException($"ERROR : Missing command handler for {command.GetType().FullName}.");
     }
 
-    private int CommandHistoryMaxSize;
-    private List<ICommand> CommandHistory;
-
     private void AddCommandToHistory(ICommand command)
     {
-        if (CommandHistory.Count == CommandHistoryMaxSize)
+        if (_commandHistory.Count == _commandHistoryMaxSize)
         {
-            CommandHistory.Remove(CommandHistory.First());
+            _commandHistory.Remove(_commandHistory.First());
         }
 
-        CommandHistory.Add(command);
+        _commandHistory.Add(command);
     }
 
     public IQueryResponse<T>? Execute<T>(IQuery<T> query)
@@ -219,12 +213,12 @@ public class UndoableMediator : IUndoableMediator
     // At the moment, we undo the last command and that's it, no redo expected in first iteration
     public void Undo(ICommand command)
     {
-        if (CommandHistory.Count == 0)
+        if (_commandHistory.Count == 0)
         {
             return;
         }
 
-        var lastCommand = CommandHistory.Last();
+        var lastCommand = _commandHistory.Last();
 
         if (_commandHandlers.TryGetValue(command.GetType(), out var genericHandler) && genericHandler != null)
         {
@@ -234,15 +228,15 @@ public class UndoableMediator : IUndoableMediator
 
     public void UndoLastCommand()
     {
-        if (CommandHistory.Count == 0)
+        if (_commandHistory.Count == 0)
         {
             return;
         }
 
-        var lastCommand = CommandHistory.Last();
+        var lastCommand = _commandHistory.Last();
 
         Undo(lastCommand);
 
-        CommandHistory.Remove(lastCommand);
+        _commandHistory.Remove(lastCommand);
     }
 }

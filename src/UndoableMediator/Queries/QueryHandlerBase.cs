@@ -1,4 +1,7 @@
-﻿namespace UndoableMediator.Queries;
+﻿using UndoableMediator.Commands;
+using UndoableMediator.Mediators;
+
+namespace UndoableMediator.Queries;
 
 public abstract class QueryHandlerBase<TQuery, TResponse> : IQueryHandler<TQuery, TResponse>
     where TQuery : class, IQuery<TResponse>
@@ -7,6 +10,10 @@ public abstract class QueryHandlerBase<TQuery, TResponse> : IQueryHandler<TQuery
 
     public IQueryResponse Execute(IQuery query)
     {
-        return this.Execute(query as TQuery);
+        if (query is TQuery castedCommand)
+        {
+            return Execute(castedCommand);
+        }
+        throw new InvalidOperationException($"Cannot execute query of type {query.GetType().FullName} because it is not of type {typeof(TQuery).FullName}");
     }
 }

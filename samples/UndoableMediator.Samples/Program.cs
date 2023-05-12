@@ -1,4 +1,5 @@
 using UndoableMediator.Commands;
+using UndoableMediator.Mediators;
 using UndoableMediator.TestModels;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,7 +17,7 @@ var testCommand = new ChangeAgeCommand(15);
 //var genericHandler = new ChangeAgeCommandHandler() as ICommandHandler<ChangeAgeCommand>;
 //genericHandler.UndoSubCommands(testCommand, mediator);
 
-var result1 = mediator.Execute(command, (_) => true);
+var result1 = mediator.Execute(command, IUndoableMediator.AddAlways);
 
 var query = new RandomIntQuery();
 var result2 = mediator.Execute<int>(query);

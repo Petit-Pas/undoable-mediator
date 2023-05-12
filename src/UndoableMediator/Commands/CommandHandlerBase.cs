@@ -26,7 +26,11 @@ public abstract class CommandHandlerBase<TCommand> : CommonCommandHandlerBase<TC
     // generic method
     public ICommandResponse Execute(ICommand command, IUndoableMediator mediator)
     {
-        return this.Execute(command as TCommand, mediator);
+        if (command is TCommand castedCommand)
+        {
+            return Execute(castedCommand, mediator);
+        }
+        throw new InvalidOperationException($"Cannot execute command of type {command.GetType().FullName} because it is not of type {typeof(TCommand).FullName}");
     }
 
     // specialized method, needs to be implemented
@@ -35,7 +39,11 @@ public abstract class CommandHandlerBase<TCommand> : CommonCommandHandlerBase<TC
     // generic method
     public void Undo(ICommand command, IUndoableMediator mediator)
     {
-        Undo(command as TCommand, mediator);
+        if (command is TCommand castedCommand)
+        {
+            Undo(castedCommand, mediator);
+        }
+        throw new InvalidOperationException($"Cannot undo command of type {command.GetType().FullName} because it is not of type {typeof(TCommand).FullName}");
     }
 
     // specialized method, can be overriden but don't forget to keep calling base.Undo() if the command has sub commands to undo them as well
@@ -52,16 +60,24 @@ public abstract class CommandHandlerBase<TCommand, TResponse> : CommonCommandHan
     // generic method
     public ICommandResponse Execute(ICommand command, IUndoableMediator mediator)
     {
-        return Execute(command as TCommand, mediator);
+        if (command is TCommand castedCommand)
+        {
+            return Execute(castedCommand, mediator);
+        }
+        throw new InvalidOperationException($"Cannot execute command of type {command.GetType().FullName} because it is not of type {typeof(TCommand).FullName}");
     }
-    
+
     // specialized method, needs to be implemented
     public abstract ICommandResponse<TResponse> Execute(TCommand command, IUndoableMediator mediator);
-    
+
     // generic method
     public void Undo(ICommand command, IUndoableMediator mediator)
     {
-        Undo(command as TCommand, mediator);
+        if (command is TCommand castedCommand)
+        {
+            Execute(castedCommand, mediator);
+        }
+        throw new InvalidOperationException($"Cannot undo command of type {command.GetType().FullName} because it is not of type {typeof(TCommand).FullName}");
     }
 
     // specialized method, can be overriden but don't forget to keep calling base.Undo() if the command has sub commands to undo them as well
