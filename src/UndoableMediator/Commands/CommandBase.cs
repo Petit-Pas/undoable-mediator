@@ -1,6 +1,4 @@
-﻿using UndoableMediator.Mediators;
-
-namespace UndoableMediator.Commands;
+﻿namespace UndoableMediator.Commands;
 
 public abstract class CommandBase : ICommand
 {

@@ -1,4 +1,5 @@
 ﻿using System.Reflection;
+using Microsoft.Extensions.Logging;
 using UndoableMediator.Commands;
 using UndoableMediator.Queries;
 using UndoableMediator.Requests;
@@ -7,38 +8,45 @@ namespace UndoableMediator.Mediators;
 
 // TODO this still needs a sanity check after the ScanAssemblies
 
-public class UndoableMediator : IUndoableMediator
+public class Mediator : IUndoableMediator
 {
+    private readonly ILogger _logger;
+
     private readonly Dictionary<Type, ICommandHandler?> _commandHandlers = new();
     private readonly Dictionary<Type, IQueryHandler?> _queryHandlers = new();
 
-    private readonly int _commandHistoryMaxSize;
+    // Config
+    internal static int CommandHistoryMaxSize { get; set; } = 64;
+    internal static Assembly[]? AdditionalAssemblies = Array.Empty<Assembly>();
+    internal static bool ThrowsOnMissingHandler { get; set; }
+    internal static bool ShouldScanAutomatically { get; set; }
+
     private readonly List<ICommand> _commandHistory;
 
-    public UndoableMediator(int maxSize = 64)
+    public Mediator(ILogger<Mediator> logger)
     {
-        _commandHistoryMaxSize = maxSize;
-        _commandHistory = new List<ICommand>(maxSize);
-    }
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-    /// <summary>
-    ///     if a keyword list is provided, UndoableMediator will only be looking for requests and handlers in assemblies that contain one of those keywords
-    /// </summary>
-    /// <param name="keywords"></param>
-    public UndoableMediator(int maxSize = 64, IEnumerable<string>? keywords = null) : this(maxSize)
-    {
-        ScanAssemblies(keywords?.ToArray());
-    }
-
-    private void ScanAssemblies(string[]? keywords)
-    {
-        Console.WriteLine("INFO: UndoableMediator is scanning application for commands.");
-
-        var assembliesToScan = AppDomain.CurrentDomain.GetAssemblies();
-        if (keywords != null && keywords.Length != 0)
+        if (CommandHistoryMaxSize <= 0)
         {
-            assembliesToScan = assembliesToScan.Where(a => keywords.Any(k => a.FullName?.Contains(k) ?? false))
-                .ToArray();
+            throw new InvalidOperationException($"Cannot build an Mediator with a CommandHistoryMaxSize of {CommandHistoryMaxSize}");
+        }
+        _commandHistory = new List<ICommand>(CommandHistoryMaxSize);
+
+        ScanAssemblies();
+    }
+
+    internal void ScanAssemblies()
+    {
+        Console.WriteLine("INFO: Mediator is scanning application for commands.");
+
+        var assembliesToScan = ShouldScanAutomatically 
+            ? AppDomain.CurrentDomain.GetAssemblies() 
+            : Array.Empty<Assembly>();
+        
+        if (AdditionalAssemblies != null && AdditionalAssemblies.Length != 0)
+        {
+            assembliesToScan = assembliesToScan.Union(AdditionalAssemblies).ToArray();
         }
 
         foreach (var assembly in assembliesToScan)
@@ -101,7 +109,7 @@ public class UndoableMediator : IUndoableMediator
         }
     }
 
-    private void RegisterCommand(Type commandType)
+    internal void RegisterCommand(Type commandType)
     {
         if (!_commandHandlers.ContainsKey(commandType))
         {
@@ -110,11 +118,11 @@ public class UndoableMediator : IUndoableMediator
         else
         {
             Console.WriteLine(
-                $"WARNING : will not register command {commandType.FullName} because it was already known by UndoableMediator.");
+                $"WARNING : will not register command {commandType.FullName} because it was already known by Mediator.");
         }
     }
 
-    private void RegisterQuery(Type queryType)
+    internal void RegisterQuery(Type queryType)
     {
         if (!_queryHandlers.ContainsKey(queryType))
         {
@@ -123,7 +131,7 @@ public class UndoableMediator : IUndoableMediator
         else
         {
             Console.WriteLine(
-                $"WARNING : will not register query {queryType.FullName} because it was already known by UndoableMediator.");
+                $"WARNING : will not register query {queryType.FullName} because it was already known by Mediator.");
         }
     }
 
@@ -135,7 +143,7 @@ public class UndoableMediator : IUndoableMediator
             {
                 Console.WriteLine(
                     $"WARNING : will override command handler {registeredHandler.GetType().FullName} with {commandHandlerType.FullName} " +
-                    $"as the handler for {commandType.FullName} since a new value was found by UndoableMediator");
+                    $"as the handler for {commandType.FullName} since a new value was found by Mediator");
             }
         }
 
@@ -150,11 +158,50 @@ public class UndoableMediator : IUndoableMediator
             {
                 Console.WriteLine(
                     $"WARNING : will override query handler {registeredHandler.GetType().FullName} with {queryHandlerType.FullName} " +
-                    $"as the handler for {queryType.FullName} since a new value was found by UndoableMediator");
+                    $"as the handler for {queryType.FullName} since a new value was found by Mediator");
             }
         }
 
         _queryHandlers[queryType] = Activator.CreateInstance(queryHandlerType) as IQueryHandler;
+    }
+
+    internal void SanityCheck()
+    {
+        if ((HasSomeCommandsWithoutHandler() || HasSomeQueriesWithoutHandler()) && ThrowsOnMissingHandler)
+        {
+            _logger.LogError("There is at least 1 missing handler for a command or a query, and the flag to throw on that condition is set.");
+            throw new NotImplementedException("There is at least 1 missing handler for a command or a query, and the flag to throw on that condition is set.");
+        }
+    }
+
+    private bool HasSomeCommandsWithoutHandler()
+    {
+        var wasSuccessful = true;
+
+        foreach (var (commandType, handlerType) in _commandHandlers)
+        {
+            if (handlerType == null)
+            {
+                _logger.LogWarning($"Did not find a corresponding handler for command {commandType.FullName}.");
+                wasSuccessful = false;
+            }
+        }
+        return wasSuccessful;
+    }
+
+    private bool HasSomeQueriesWithoutHandler()
+    {
+        var wasSuccessful = true;
+        
+        foreach (var (queryType, handlerType) in _queryHandlers)
+        {
+            if (handlerType == null)
+            {
+                _logger.LogWarning($"Did not find a corresponding handler for query {queryType.FullName}.");
+                wasSuccessful = false;
+            }
+        }
+        return wasSuccessful;
     }
 
     public ICommandResponse Execute(ICommand command, Func<RequestStatus, bool>? shouldAddCommandToHistory = null)
@@ -192,7 +239,7 @@ public class UndoableMediator : IUndoableMediator
 
     private void AddCommandToHistory(ICommand command)
     {
-        if (_commandHistory.Count == _commandHistoryMaxSize)
+        if (_commandHistory.Count == CommandHistoryMaxSize)
         {
             _commandHistory.Remove(_commandHistory.First());
         }

@@ -1,43 +1,24 @@
-using UndoableMediator.Commands;
-using UndoableMediator.Mediators;
+using UndoableMediator.DependencyInjection;
 using UndoableMediator.TestModels;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
-var mediator = new UndoableMediator.Mediators.UndoableMediator(keywords: new[] { "UndoableMediator" });
+var test = AppDomain.CurrentDomain.GetAssemblies().OrderBy(x => x.FullName);
 
-var command = new SetRandomAgeCommand();
-
-var testCommand = new ChangeAgeCommand(15);
-//var handler = new ChangeAgeCommandHandler();
-//handler.UndoSubCommands(testCommand, mediator);
-
-//var genericHandler = new ChangeAgeCommandHandler() as ICommandHandler<ChangeAgeCommand>;
-//genericHandler.UndoSubCommands(testCommand, mediator);
-
-var result1 = mediator.Execute(command, IUndoableMediator.AddAlways);
-
-var query = new RandomIntQuery();
-var result2 = mediator.Execute<int>(query);
-
-var command2 = new CancelableQuery(true);
-var result3 = mediator.Execute(command2);
-
-var age = AffectedObject.Age;
-
-mediator.UndoLastCommand();
-
-var age2 = AffectedObject.Age;
-
-mediator.UndoLastCommand();
-
+var command = new ChangeAgeCommand(12);
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+builder.Services.AddUndoableMediator(options =>
+{
+    options.AssembliesToScan = new[] { typeof(ChangeAgeCommand).Assembly };
+    options.ShouldScanAutomatically = false;
+});
 
 var app = builder.Build();
 

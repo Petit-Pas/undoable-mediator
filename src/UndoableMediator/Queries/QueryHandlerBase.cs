@@ -1,7 +1,4 @@
-﻿using UndoableMediator.Commands;
-using UndoableMediator.Mediators;
-
-namespace UndoableMediator.Queries;
+﻿namespace UndoableMediator.Queries;
 
 public abstract class QueryHandlerBase<TQuery, TResponse> : IQueryHandler<TQuery, TResponse>
     where TQuery : class, IQuery<TResponse>

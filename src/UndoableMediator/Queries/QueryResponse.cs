@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using UndoableMediator.Requests;
+﻿using UndoableMediator.Requests;
 
 namespace UndoableMediator.Queries;
 

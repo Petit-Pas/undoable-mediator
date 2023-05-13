@@ -43,7 +43,10 @@ public abstract class CommandHandlerBase<TCommand> : CommonCommandHandlerBase<TC
         {
             Undo(castedCommand, mediator);
         }
-        throw new InvalidOperationException($"Cannot undo command of type {command.GetType().FullName} because it is not of type {typeof(TCommand).FullName}");
+        else
+        {
+            throw new InvalidOperationException($"Cannot undo command of type {command.GetType().FullName} because it is not of type {typeof(TCommand).FullName}");
+        }
     }
 
     // specialized method, can be overriden but don't forget to keep calling base.Undo() if the command has sub commands to undo them as well
@@ -77,7 +80,10 @@ public abstract class CommandHandlerBase<TCommand, TResponse> : CommonCommandHan
         {
             Execute(castedCommand, mediator);
         }
-        throw new InvalidOperationException($"Cannot undo command of type {command.GetType().FullName} because it is not of type {typeof(TCommand).FullName}");
+        else
+        {
+            throw new InvalidOperationException($"Cannot undo command of type {command.GetType().FullName} because it is not of type {typeof(TCommand).FullName}");
+        }
     }
 
     // specialized method, can be overriden but don't forget to keep calling base.Undo() if the command has sub commands to undo them as well
