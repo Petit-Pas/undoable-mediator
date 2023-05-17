@@ -29,16 +29,17 @@ public class Mediator : IUndoableMediator
 
         if (CommandHistoryMaxSize <= 0)
         {
-            throw new InvalidOperationException($"Cannot build an Mediator with a CommandHistoryMaxSize of {CommandHistoryMaxSize}");
+            throw new InvalidOperationException($"Cannot build a Mediator with a CommandHistoryMaxSize of {CommandHistoryMaxSize}");
         }
         _commandHistory = new List<ICommand>(CommandHistoryMaxSize);
 
         ScanAssemblies();
+        SanityCheck();
     }
 
     internal void ScanAssemblies()
     {
-        Console.WriteLine("INFO: Mediator is scanning application for commands.");
+        _logger.LogInformation("Mediator is scanning application for commands.");
 
         var assembliesToScan = ShouldScanAutomatically 
             ? AppDomain.CurrentDomain.GetAssemblies() 
@@ -51,51 +52,52 @@ public class Mediator : IUndoableMediator
 
         foreach (var assembly in assembliesToScan)
         {
-            Console.WriteLine($"DEBUG : MediatorBase is scanning '{assembly.FullName}' assembly looking for commands");
+            _logger.LogDebug($"Mediator is scanning '{0}' assembly looking for commands", assembly.FullName);
             try
             {
                 foreach (var implementationType in assembly.GetTypes())
                 {
-                    var name = implementationType.FullName;
-                    ;
                     if (!implementationType.GetTypeInfo().IsAbstract)
                     {
                         foreach (var interfaceType in implementationType.GetInterfaces())
                         {
                             if (interfaceType == typeof(ICommand))
                             {
-                                Console.WriteLine(
-                                    $"INFO : MediatorBase found the '{implementationType.FullName}' command.");
+                                _logger.LogInformation(
+                                    $"MediatorBase found the '{implementationType.FullName}' command.");
                                 RegisterCommand(implementationType);
                             }
+                            
                             else if (interfaceType == typeof(IQuery))
                             {
-                                Console.WriteLine(
-                                    $"INFO : MediatorBase found the '{implementationType.FullName}' query.");
+                                _logger.LogInformation(
+                                    $"Mediator found the '{implementationType.FullName}' query.");
                                 RegisterQuery(implementationType);
                             }
+                            
                             else if (interfaceType.IsGenericType &&
                                      interfaceType.GetGenericTypeDefinition() == typeof(ICommandHandler<>))
                             {
                                 var commandType = interfaceType.GetGenericArguments().Single();
-                                Console.WriteLine(
-                                    $"INFO : MediatorBase found the '{implementationType.FullName}' command handler to handle {commandType.FullName}.");
+                                _logger.LogInformation(
+                                    $"Mediator found the '{implementationType.FullName}' command handler to handle {commandType.FullName}.");
                                 RegisterCommandHandler(implementationType, commandType);
                             }
                             else if (interfaceType.IsGenericType &&
                                      interfaceType.GetGenericTypeDefinition() == typeof(ICommandHandler<,>))
                             {
                                 var commandType = interfaceType.GetGenericArguments().First();
-                                Console.WriteLine(
-                                    $"INFO : MediatorBase found the '{implementationType.FullName}' command handler to handle {commandType.FullName}.");
+                                _logger.LogInformation(
+                                    $"Mediator found the '{implementationType.FullName}' command handler to handle {commandType.FullName}.");
                                 RegisterCommandHandler(implementationType, commandType);
                             }
+                            
                             else if (interfaceType.IsGenericType &&
                                      interfaceType.GetGenericTypeDefinition() == typeof(IQueryHandler<,>))
                             {
                                 var queryType = interfaceType.GetGenericArguments().First();
-                                Console.WriteLine(
-                                    $"INFO : MediatorBase found the '{implementationType.FullName}' query handler to handle {queryType.FullName}.");
+                                _logger.LogInformation(
+                                    $"Mediator found the '{implementationType.FullName}' query handler to handle {queryType.FullName}.");
                                 RegisterQueryHandler(implementationType, queryType);
                             }
                         }
@@ -104,7 +106,7 @@ public class Mediator : IUndoableMediator
             }
             catch (ReflectionTypeLoadException)
             {
-                Console.WriteLine($"WARNING : BaseMediator could not load types from {assembly.FullName}");
+                _logger.LogWarning($"BaseMediator could not load types from {assembly.FullName}");
             }
         }
     }
@@ -117,8 +119,8 @@ public class Mediator : IUndoableMediator
         }
         else
         {
-            Console.WriteLine(
-                $"WARNING : will not register command {commandType.FullName} because it was already known by Mediator.");
+            _logger.LogWarning(
+                $"Mediator will not register command {commandType.FullName} because it was already known by Mediator.");
         }
     }
 
@@ -130,8 +132,8 @@ public class Mediator : IUndoableMediator
         }
         else
         {
-            Console.WriteLine(
-                $"WARNING : will not register query {queryType.FullName} because it was already known by Mediator.");
+            _logger.LogWarning(
+                $"Mediator will not register query {queryType.FullName} because it was already known by Mediator.");
         }
     }
 
@@ -141,8 +143,8 @@ public class Mediator : IUndoableMediator
         {
             if (registeredHandler != null)
             {
-                Console.WriteLine(
-                    $"WARNING : will override command handler {registeredHandler.GetType().FullName} with {commandHandlerType.FullName} " +
+                _logger.LogWarning(
+                    $"Mediator will override command handler {registeredHandler.GetType().FullName} with {commandHandlerType.FullName} " +
                     $"as the handler for {commandType.FullName} since a new value was found by Mediator");
             }
         }
@@ -156,8 +158,8 @@ public class Mediator : IUndoableMediator
         {
             if (registeredHandler != null)
             {
-                Console.WriteLine(
-                    $"WARNING : will override query handler {registeredHandler.GetType().FullName} with {queryHandlerType.FullName} " +
+                _logger.LogWarning(
+                    $"Mediator will override query handler {registeredHandler.GetType().FullName} with {queryHandlerType.FullName} " +
                     $"as the handler for {queryType.FullName} since a new value was found by Mediator");
             }
         }
@@ -176,32 +178,32 @@ public class Mediator : IUndoableMediator
 
     private bool HasSomeCommandsWithoutHandler()
     {
-        var wasSuccessful = true;
+        var missingAtLeastOne = false;
 
         foreach (var (commandType, handlerType) in _commandHandlers)
         {
             if (handlerType == null)
             {
                 _logger.LogWarning($"Did not find a corresponding handler for command {commandType.FullName}.");
-                wasSuccessful = false;
+                missingAtLeastOne = true;
             }
         }
-        return wasSuccessful;
+        return missingAtLeastOne;
     }
 
     private bool HasSomeQueriesWithoutHandler()
     {
-        var wasSuccessful = true;
+        var missingAtLeastOne = false;
         
         foreach (var (queryType, handlerType) in _queryHandlers)
         {
             if (handlerType == null)
             {
                 _logger.LogWarning($"Did not find a corresponding handler for query {queryType.FullName}.");
-                wasSuccessful = false;
+                missingAtLeastOne = true;
             }
         }
-        return wasSuccessful;
+        return missingAtLeastOne;
     }
 
     public ICommandResponse Execute(ICommand command, Func<RequestStatus, bool>? shouldAddCommandToHistory = null)
@@ -217,7 +219,7 @@ public class Mediator : IUndoableMediator
             return response;
         }
 
-        throw new NullReferenceException($"ERROR : Missing command handler for {command.GetType().FullName}.");
+        throw new NotImplementedException($"Missing command handler for {command.GetType().FullName}.");
     }
 
     public ICommandResponse<TResponse>? Execute<TResponse>(ICommand<TResponse> command,
@@ -234,7 +236,7 @@ public class Mediator : IUndoableMediator
             return response;
         }
 
-        throw new NullReferenceException($"ERROR : Missing command handler for {command.GetType().FullName}.");
+        throw new NotImplementedException($"Missing command handler for {command.GetType().FullName}.");
     }
 
     private void AddCommandToHistory(ICommand command)
@@ -251,33 +253,32 @@ public class Mediator : IUndoableMediator
     {
         if (_queryHandlers.TryGetValue(query.GetType(), out var handler) && handler != null)
         {
+            _logger.LogDebug("Executing query of type {0}", query.GetType().FullName);
             return handler.Execute(query) as IQueryResponse<T>;
         }
 
-        throw new NullReferenceException($"ERROR : Missing command handler for {query.GetType().FullName}.");
+        throw new NotImplementedException($"Missing command handler for {query.GetType().FullName}.");
+    }
+
+    public void Undo(ICommand command)
+    {
+        if (_commandHandlers.TryGetValue(command.GetType(), out var genericHandler) && genericHandler != null)
+        {
+            _logger.LogDebug("Undoing command of type {0}", command.GetType().FullName);
+            genericHandler.Undo(command, this);
+        }
+        else
+        {
+            throw new NotImplementedException($"Missing command handler for {command.GetType().FullName}.");
+        }
     }
 
     // At the moment, we undo the last command and that's it, no redo expected in first iteration
-    public void Undo(ICommand command)
+    public bool UndoLastCommand()
     {
         if (_commandHistory.Count == 0)
         {
-            return;
-        }
-
-        var lastCommand = _commandHistory.Last();
-
-        if (_commandHandlers.TryGetValue(command.GetType(), out var genericHandler) && genericHandler != null)
-        {
-            genericHandler.Undo(command, this);
-        }
-    }
-
-    public void UndoLastCommand()
-    {
-        if (_commandHistory.Count == 0)
-        {
-            return;
+            return false;
         }
 
         var lastCommand = _commandHistory.Last();
@@ -285,5 +286,8 @@ public class Mediator : IUndoableMediator
         Undo(lastCommand);
 
         _commandHistory.Remove(lastCommand);
+        return true;
     }
+
+    public int HistoryLength => _commandHistory.Count;
 }

@@ -14,7 +14,13 @@ public interface IUndoableMediator
 
     void Undo(ICommand command);
 
-    void UndoLastCommand();
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <returns> true if there was a command to undo, false otherwise </returns>
+    bool UndoLastCommand();
+
+    public int HistoryLength { get; }
 
     public static bool AddAlways(RequestStatus _) => true;
     public static bool AddNever(RequestStatus _) => false;

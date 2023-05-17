@@ -7,7 +7,7 @@ public abstract class CommandBase : ICommand
         SubCommands.Push(command);
     }
 
-    public Stack<CommandBase> SubCommands { get; set; } = new Stack<CommandBase>();
+    public Stack<CommandBase> SubCommands { get; set; } = new ();
 }
 
 public abstract class CommandBase<TResponse> : ICommand<TResponse>
@@ -17,5 +17,5 @@ public abstract class CommandBase<TResponse> : ICommand<TResponse>
         SubCommands.Push(command);
     }
 
-    public Stack<CommandBase> SubCommands { get; set; } = new Stack<CommandBase>();
+    public Stack<CommandBase> SubCommands { get; set; } = new ();
 }
