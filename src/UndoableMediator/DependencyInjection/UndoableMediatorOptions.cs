@@ -11,6 +11,12 @@ public class UndoableMediatorOptions
     public int CommandHistoryMaxSize { get; set; } = 64;
 
     /// <summary>
+    ///     The max amount of commands to remember for the redo operation.
+    ///     Will be cleared anytime a command is executed and added to the history since it rewrites the whole thing.
+    /// </summary>
+    public int RedoHistoryMaxSize { get; set; } = 32;
+
+    /// <summary>
     ///     Whenever the mediator is built, it then scans itself to any command with a missing handler
     ///     If that flag is set to true, it will throw an exception instead of just warning
     ///     true by default.
@@ -22,7 +28,7 @@ public class UndoableMediatorOptions
     ///     In that case, you can just specify the assembly in that array.
 
     /// </summary>
-    public Assembly[] AssembliesToScan { get; set; }
+    public Assembly[] AssembliesToScan { get; set; } = Array.Empty<Assembly>();
 
     /// <summary>
     ///     UndoableMediator will scan all assemblies it finds in AppDomain.CurrentDomain.GetAssemblies() by default.

@@ -14,7 +14,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddUndoableMediator(options =>
+builder.Services.ConfigureMediator(options =>
 {
     options.AssembliesToScan = new[] { typeof(ChangeAgeCommand).Assembly };
     options.ShouldScanAutomatically = false;

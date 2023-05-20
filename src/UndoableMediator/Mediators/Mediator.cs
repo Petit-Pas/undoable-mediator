@@ -6,23 +6,25 @@ using UndoableMediator.Requests;
 
 namespace UndoableMediator.Mediators;
 
-// TODO this still needs a sanity check after the ScanAssemblies
-
 public class Mediator : IUndoableMediator
 {
     private readonly ILogger _logger;
 
-    private readonly Dictionary<Type, ICommandHandler?> _commandHandlers = new();
-    private readonly Dictionary<Type, IQueryHandler?> _queryHandlers = new();
+    // TODO decouple this from the mediator so that the GetCommandHandlerFor(command/query) can be extracted
+    internal readonly Dictionary<Type, ICommandHandler?> _commandHandlers = new();
+    internal readonly Dictionary<Type, IQueryHandler?> _queryHandlers = new();
 
     // Config
     internal static int CommandHistoryMaxSize { get; set; } = 64;
+    internal static int CommandRedoHistoryMaxSize { get; set; } = 32;
     internal static Assembly[]? AdditionalAssemblies = Array.Empty<Assembly>();
     internal static bool ThrowsOnMissingHandler { get; set; }
     internal static bool ShouldScanAutomatically { get; set; }
 
-    private readonly List<ICommand> _commandHistory;
-
+    // TODO these could be replaced with a max sized stack
+    internal readonly List<ICommand> _commandHistory;
+    internal readonly List<ICommand> _redoHistory;
+        
     public Mediator(ILogger<Mediator> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -31,7 +33,12 @@ public class Mediator : IUndoableMediator
         {
             throw new InvalidOperationException($"Cannot build a Mediator with a CommandHistoryMaxSize of {CommandHistoryMaxSize}");
         }
+        if (CommandRedoHistoryMaxSize <= 0)
+        {
+            throw new InvalidOperationException($"Cannot build a Mediator with a CommandRedoHistoryMaxSize of {CommandRedoHistoryMaxSize}");
+        }
         _commandHistory = new List<ICommand>(CommandHistoryMaxSize);
+        _redoHistory = new List<ICommand>(CommandRedoHistoryMaxSize);
 
         ScanAssemblies();
         SanityCheck();
@@ -206,37 +213,49 @@ public class Mediator : IUndoableMediator
         return missingAtLeastOne;
     }
 
+    internal ICommandHandler GetCommandHandlerFor(Type commandType)
+    {
+        if (_commandHandlers.TryGetValue(commandType, out var handler) && handler != null)
+        {
+            return handler;
+        }
+        throw new NotImplementedException($"Missing command handler for {commandType.FullName}.");
+    }
+
+    internal IQueryHandler GetQueryHandlerFor(Type queryType)
+    {
+        if (_queryHandlers.TryGetValue(queryType, out var handler) && handler != null)
+        {
+            return handler;
+        }
+        throw new NotImplementedException($"Missing query handler for {queryType.FullName}");
+    }
+
     public ICommandResponse Execute(ICommand command, Func<RequestStatus, bool>? shouldAddCommandToHistory = null)
     {
-        if (_commandHandlers.TryGetValue(command.GetType(), out var handler) && handler != null)
+        var handler = GetCommandHandlerFor(command.GetType());
+        var response = handler.Execute(command, this);
+     
+        if (shouldAddCommandToHistory != null && shouldAddCommandToHistory(response.Status))
         {
-            var response = handler.Execute(command, this);
-            if (shouldAddCommandToHistory != null && shouldAddCommandToHistory(response.Status))
-            {
-                AddCommandToHistory(command);
-            }
-
-            return response;
+            AddCommandToHistory(command);
         }
 
-        throw new NotImplementedException($"Missing command handler for {command.GetType().FullName}.");
+        return response;
     }
 
     public ICommandResponse<TResponse>? Execute<TResponse>(ICommand<TResponse> command,
         Func<RequestStatus, bool>? shouldAddCommandToHistory = null)
     {
-        if (_commandHandlers.TryGetValue(command.GetType(), out var handler) && handler != null)
+        var handler = GetCommandHandlerFor(command.GetType());
+        var response = handler.Execute(command, this) as ICommandResponse<TResponse>;
+        
+        if (shouldAddCommandToHistory != null && shouldAddCommandToHistory(response!.Status))
         {
-            var response = handler.Execute(command, this) as ICommandResponse<TResponse>;
-            if (shouldAddCommandToHistory != null && shouldAddCommandToHistory(response!.Status))
-            {
-                AddCommandToHistory(command);
-            }
-
-            return response;
+            AddCommandToHistory(command);
         }
 
-        throw new NotImplementedException($"Missing command handler for {command.GetType().FullName}.");
+        return response;
     }
 
     private void AddCommandToHistory(ICommand command)
@@ -247,17 +266,25 @@ public class Mediator : IUndoableMediator
         }
 
         _commandHistory.Add(command);
+        _redoHistory.Clear();
+    }
+
+    private void MoveLastCommandFromRedoHistoryToHistory()
+    {
+        if (_redoHistory.Count == 0)
+        {
+            return;
+        }
+        var command = _redoHistory.Last();
+        _redoHistory.Remove(command);
+        _commandHistory.Add(command);
     }
 
     public IQueryResponse<T>? Execute<T>(IQuery<T> query)
     {
-        if (_queryHandlers.TryGetValue(query.GetType(), out var handler) && handler != null)
-        {
-            _logger.LogDebug("Executing query of type {0}", query.GetType().FullName);
-            return handler.Execute(query) as IQueryResponse<T>;
-        }
-
-        throw new NotImplementedException($"Missing command handler for {query.GetType().FullName}.");
+        var handler = GetQueryHandlerFor(query.GetType());
+        _logger.LogDebug("Executing query of type {0}", query.GetType().FullName);
+        return handler.Execute(query) as IQueryResponse<T>;
     }
 
     public void Undo(ICommand command)
@@ -273,7 +300,6 @@ public class Mediator : IUndoableMediator
         }
     }
 
-    // At the moment, we undo the last command and that's it, no redo expected in first iteration
     public bool UndoLastCommand()
     {
         if (_commandHistory.Count == 0)
@@ -286,6 +312,24 @@ public class Mediator : IUndoableMediator
         Undo(lastCommand);
 
         _commandHistory.Remove(lastCommand);
+        _redoHistory.Add(lastCommand);
+        return true;
+    }
+
+    public bool Redo()
+    {
+        if (_redoHistory.Count == 0) 
+        {
+            return false;
+        }
+
+        var lastCommandUndone = _redoHistory.Last();
+        
+        // we can't let Execute add it back to the history because that would prune the redo history,
+        // which is not needed when redoing commands from the redo historys
+        Execute(lastCommandUndone, (_) => false);
+        MoveLastCommandFromRedoHistoryToHistory();
+        
         return true;
     }
 

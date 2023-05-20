@@ -4,8 +4,8 @@ namespace UndoableMediator.TestModels;
 
 public class RandomIntQueryHandler : QueryHandlerBase<RandomIntQuery, int>
 {
-    public override IQueryResponse<int> Execute(RandomIntQuery _)
+    public override IQueryResponse<int> Execute(RandomIntQuery query)
     {
-        return QueryResponse<int>.Success(new Random().Next(1000));
+        return QueryResponse<int>.Success(new Random().Next() % query.Range);
     }
 }

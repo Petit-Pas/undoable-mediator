@@ -19,6 +19,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\UndoableMediator\UndoableMediator.csproj" />
     <ProjectReference Include="..\..\UndoableMediator.MissingHandlerDll\UndoableMediator.MissingHandlerDll.csproj" />
+    <ProjectReference Include="..\UndoableMediator.TestModels\UndoableMediator.TestModels.csproj" />
   </ItemGroup>
 
 </Project>

@@ -5,7 +5,7 @@ namespace UndoableMediator.DependencyInjection;
 
 public static class ServiceCollectionExtensions
 {
-    public static void AddUndoableMediator(this IServiceCollection serviceCollection, Action<UndoableMediatorOptions>? optionSetter = null)
+    public static void ConfigureMediator(this IServiceCollection serviceCollection, Action<UndoableMediatorOptions>? optionSetter = null)
     {
         var options = new UndoableMediatorOptions();
 
