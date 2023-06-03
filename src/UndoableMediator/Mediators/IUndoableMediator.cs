@@ -6,13 +6,13 @@ namespace UndoableMediator.Mediators;
 
 public interface IUndoableMediator
 {
-    ICommandResponse? Execute<TCommand>(TCommand command, Func<RequestStatus, bool>? shouldAddCommandToHistory = null)
+    ICommandResponse Execute<TCommand>(TCommand command, Func<RequestStatus, bool>? shouldAddCommandToHistory = null)
         where TCommand : class, ICommand;
 
-    ICommandResponse<TCommandResponse>? Execute<TCommand, TCommandResponse>(TCommand command, Func<RequestStatus, bool>? shouldAddCommandToHistory = null)
+    ICommandResponse<TCommandResponse> Execute<TCommand, TCommandResponse>(TCommand command, Func<RequestStatus, bool>? shouldAddCommandToHistory = null)
         where TCommand : class, ICommand<TCommandResponse>;
 
-    IQueryResponse<TResponse>? Execute<TQuery, TResponse>(TQuery query)
+    IQueryResponse<TResponse> Execute<TQuery, TResponse>(TQuery query)
         where TQuery : IQuery<TResponse>;
 
     void Undo(ICommand command);

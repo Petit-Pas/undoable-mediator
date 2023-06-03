@@ -12,36 +12,47 @@ namespace UndoableMediator.Samples.Controllers
         private readonly ILogger<TestController> _logger;
         private readonly IUndoableMediator _mediator;
         private readonly IServiceProvider _serviceCollection;
-        private readonly ICommandHandler<SetRandomAgeCommand, int> _commandHandler;
         private readonly IServiceProvider _serviceProvider;
 
-        public TestController(ILogger<TestController> logger, IUndoableMediator mediator,  ICommandHandler<SetRandomAgeCommand, int> commandHandler, IServiceProvider serviceProvider)
+        public TestController(ILogger<TestController> logger, IUndoableMediator mediator,
+            IServiceProvider serviceProvider)
         {
             _logger = logger;
             _mediator = mediator;
-            _commandHandler = commandHandler;
             _serviceProvider = serviceProvider;
+        }
+
+        [HttpGet]
+        [Route("getRandomInt")]
+        public ActionResult<int> GetInt()
+        {
+            var command = new RandomIntQuery();
+            var result = _mediator.Execute<RandomIntQuery, int>(command);
+
+            return Ok(result.Response);
+        }
+
+        [HttpGet]
+        [Route("setDefinedInt")]
+        public ActionResult SetInt()
+        {
+            var command = new ChangeAgeCommand(25);
+
+            _mediator.Execute(command);
+
+            return Ok();
         }
 
         [HttpGet]
         [Route("setRandomAge")]
         public ActionResult<int> Get()
         {
-            var test = _serviceProvider.GetService(typeof(ICommandHandler<ChangeAgeCommand>));
-
             var command = new SetRandomAgeCommand();
 
-            var value1 = AffectedObject.Age;
-
             var result = _mediator.Execute<SetRandomAgeCommand, int>(command, (_) => true);
-
-            var value2 = AffectedObject.Age;
-            
             _mediator.UndoLastCommand();
-            
-            var value3 = AffectedObject.Age;
 
-            return Ok(result?.Response);
+            return Ok(result.Response);
         }
     }
 }

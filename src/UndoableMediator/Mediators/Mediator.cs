@@ -72,34 +72,31 @@ public class Mediator : IUndoableMediator
         return handler;
     }
 
-    public ICommandResponse? Execute<TCommand>(TCommand command, Func<RequestStatus, bool>? shouldAddCommandToHistory = null)
+    public ICommandResponse Execute(ICommand command, ICommandHandler commandHandler, Func<RequestStatus, bool>? shouldAddCommandToHistory = null)
+    {
+        var response = commandHandler.Execute(command);
+
+        if (shouldAddCommandToHistory != null && shouldAddCommandToHistory(response.Status))
+        {
+            AddCommandToHistory(command);
+        }
+        return response;
+    }
+
+    public ICommandResponse Execute<TCommand>(TCommand command, Func<RequestStatus, bool>? shouldAddCommandToHistory = null)
         where TCommand : class, ICommand
     {
         var handler = GetCommandHandlerFor<TCommand>();
 
-        var response = handler.Execute(command);
-
-        if (shouldAddCommandToHistory != null && shouldAddCommandToHistory(response.Status))
-        {
-            AddCommandToHistory(command);
-        }
-
-        return response;
+        return Execute(command, handler, shouldAddCommandToHistory);
     }
 
-    public ICommandResponse<TCommandResponse>? Execute<TCommand, TCommandResponse>(TCommand command, Func<RequestStatus, bool>? shouldAddCommandToHistory = null)
+    public ICommandResponse<TCommandResponse> Execute<TCommand, TCommandResponse>(TCommand command, Func<RequestStatus, bool>? shouldAddCommandToHistory = null)
         where TCommand : class, ICommand<TCommandResponse>
     {
         var handler = GetCommandHandlerFor<TCommand, TCommandResponse>();
 
-        var response = handler.Execute(command);
-     
-        if (shouldAddCommandToHistory != null && shouldAddCommandToHistory(response.Status))
-        {
-            AddCommandToHistory(command);
-        }
-
-        return response as ICommandResponse<TCommandResponse>;
+        return (ICommandResponse<TCommandResponse>)Execute(command, handler, shouldAddCommandToHistory);
     }
 
 
@@ -134,25 +131,28 @@ public class Mediator : IUndoableMediator
 
     public void Undo(ICommand command)
     {
-        ICommandHandler handler = null;
+        ICommandHandler? handler = null;
 
         foreach (var interfaceType in command.GetType().GetInterfaces())
         {
             if (interfaceType == typeof(ICommand))
             {
-                var methodInfo = typeof(Mediator).GetMethods(BindingFlags.NonPublic | BindingFlags.Instance).First(x => x.Name == nameof(GetCommandHandlerFor) && x.GetGenericArguments().Length == 1);
-                var closedGenericMethod = methodInfo.MakeGenericMethod(command.GetType());
-                handler = closedGenericMethod.Invoke(this, null) as ICommandHandler;
+                var methodInfo = GetPrivateMethodByReflection<Mediator>(nameof(GetCommandHandlerFor), 1, command.GetType());
+                handler = methodInfo.Invoke(this, null) as ICommandHandler;
                 break;
             }
             else if (interfaceType.GetGenericTypeDefinition() == typeof(ICommand<>))
             {
-                var methodInfo = typeof(Mediator).GetMethods(BindingFlags.NonPublic | BindingFlags.Instance).First(x => x.Name == nameof(GetCommandHandlerFor) && x.GetGenericArguments().Length == 2);
-                var closedGenericMethod = methodInfo.MakeGenericMethod(command.GetType(), interfaceType.GenericTypeArguments[0]);
-                handler = closedGenericMethod.Invoke(this, null) as ICommandHandler;
+                var methodInfo = GetPrivateMethodByReflection<Mediator>(nameof(GetCommandHandlerFor), 2, command.GetType(), interfaceType.GenericTypeArguments[0]);
+                handler = methodInfo.Invoke(this, null) as ICommandHandler;
                 break;
             }
         }
+        if (handler == null)
+        {
+            throw new NotImplementedException($"Could not find a handler for command of type {command.GetType().FullName}");
+        }
+
         handler.Undo(command);
     }
 
@@ -180,16 +180,56 @@ public class Mediator : IUndoableMediator
         }
 
         var lastCommandUndone = _redoHistory.Last();
-        
+
         // we can't let Execute add it back to the history because that would prune the redo history,
         // which is not needed when redoing commands from the redo historys
 
-        // TODO This should be specified with closed geneircs again
-        Execute(lastCommandUndone, (_) => false);
+        foreach (var interfaceType in lastCommandUndone.GetType().GetInterfaces())
+        {
+            if (interfaceType == typeof(ICommand))
+            {
+                var methodInfo = GetPrivateMethodByReflection<Mediator>(nameof(Execute), 1, lastCommandUndone.GetType());
+                methodInfo.Invoke(this, new object[] {lastCommandUndone, new Func<RequestStatus, bool> ((_) => false)});
+                break;
+            }
+            else if (interfaceType.GetGenericTypeDefinition() == typeof(ICommand<>))
+            {
+                var methodInfo = GetPrivateMethodByReflection<Mediator>(nameof(Execute), 2, lastCommandUndone.GetType(), interfaceType.GenericTypeArguments[0]);
+                methodInfo.Invoke(this, new object[] { lastCommandUndone, new Func<RequestStatus, bool> ((_) => false) });
+                break;
+            }
+        }
+
         MoveLastCommandFromRedoHistoryToHistory();
         
         return true;
     }
 
     public int HistoryLength => _commandHistory.Count;
+
+    /// <summary>
+    ///  These methods could be moved in another class.
+    /// </summary>
+    /// <param name="baseMethod"></param>
+    /// <param name="type1"></param>
+    /// <returns></returns>
+    private MethodInfo GetClosedGenericMethod(MethodInfo baseMethod, Type type1)
+    {
+        return baseMethod.MakeGenericMethod(type1);
+    }
+
+    private MethodInfo GetClosedGenericMethod(MethodInfo baseMethod, Type type1, Type? type2 = null)
+    {
+        if (type2 == null)
+        {
+            return GetClosedGenericMethod(baseMethod, type1);
+        }
+        return baseMethod.MakeGenericMethod(type1, type2);
+    }
+
+    private MethodInfo GetPrivateMethodByReflection<TClass>(string methodName, int genericArguments, Type type1, Type? type2 = null)
+    {
+        var baseMethod = typeof(TClass).GetMethods(BindingFlags.NonPublic | BindingFlags.Instance).First(x => x.Name == methodName && x.GetGenericArguments().Length == genericArguments);
+        return GetClosedGenericMethod(baseMethod, type1, type2);
+    }
 }
