@@ -5,7 +5,11 @@ namespace UndoableMediator.TestModels;
 
 public class ChangeNameCommandHandler : CommandHandlerBase<ChangeNameCommand>
 {
-    public override CommandResponse Execute(ChangeNameCommand command, IUndoableMediator mediator)
+    public ChangeNameCommandHandler(IUndoableMediator mediator) : base(mediator)
+    {
+    }
+
+    public override CommandResponse Execute(ChangeNameCommand command)
     {
         command.OldName = AffectedObject.Name;
         AffectedObject.Name = command.NewName;
@@ -13,7 +17,7 @@ public class ChangeNameCommandHandler : CommandHandlerBase<ChangeNameCommand>
         return CommandResponse.Success();
     }
     
-    public override void Undo(ChangeNameCommand command, IUndoableMediator mediator)
+    public override void Undo(ChangeNameCommand command)
     {
         if (command.OldName != null)
         {

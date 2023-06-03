@@ -5,12 +5,16 @@ namespace UndoableMediator.TestModels;
 
 public class SetRandomAgeCommandHandler : CommandHandlerBase<SetRandomAgeCommand, int>
 {
-    public override CommandResponse<int> Execute(SetRandomAgeCommand command, IUndoableMediator mediator)
+    public SetRandomAgeCommandHandler(IUndoableMediator mediator) : base(mediator)
+    {
+    }
+
+    public override CommandResponse<int> Execute(SetRandomAgeCommand command)
     {
         var randomAgeQuery = new RandomIntQuery();
-        var age = mediator.Execute(randomAgeQuery);
+        var age = _mediator.Execute<RandomIntQuery, int>(randomAgeQuery);
         var changeAgeCommand = new ChangeAgeCommand(age?.Response ?? 0);
-        mediator.Execute(changeAgeCommand);
+        _mediator.Execute(changeAgeCommand);
         command.AddToSubCommands(changeAgeCommand);
 
         return CommandResponse<int>.Success(age?.Response ?? 0);

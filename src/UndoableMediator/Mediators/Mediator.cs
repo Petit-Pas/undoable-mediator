@@ -1,6 +1,8 @@
-﻿using System.Reflection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using System.Reflection;
 using UndoableMediator.Commands;
+using UndoableMediator.DependencyInjection;
 using UndoableMediator.Queries;
 using UndoableMediator.Requests;
 
@@ -9,233 +11,74 @@ namespace UndoableMediator.Mediators;
 public class Mediator : IUndoableMediator
 {
     private readonly ILogger _logger;
+    private readonly IServiceProvider _serviceProvider;
 
-    // TODO decouple this from the mediator so that the GetCommandHandlerFor(command/query) can be extracted
-    internal readonly Dictionary<Type, ICommandHandler?> _commandHandlers = new();
-    internal readonly Dictionary<Type, IQueryHandler?> _queryHandlers = new();
+    public Mediator(ILogger<IUndoableMediator> logger, IServiceProvider serviceProvider, UndoableMediatorOptions options)
+    {
+        _logger = logger;
+        _serviceProvider = serviceProvider;
+
+        _commandHistoryMaxSize = options.CommandHistoryMaxSize;
+        _commandHistoryMaxSize = options.RedoHistoryMaxSize;
+
+        _commandHistory = new List<ICommand>(_commandHistoryMaxSize);
+        _redoHistory = new List<ICommand>(_commandRedoHistoryMaxSize);
+    }
 
     // Config
-    internal static int CommandHistoryMaxSize { get; set; } = 64;
-    internal static int CommandRedoHistoryMaxSize { get; set; } = 32;
-    internal static Assembly[]? AdditionalAssemblies = Array.Empty<Assembly>();
-    internal static bool ThrowsOnMissingHandler { get; set; }
-    internal static bool ShouldScanAutomatically { get; set; }
+    private int _commandHistoryMaxSize { get; set; }
+    private int _commandRedoHistoryMaxSize { get; set; }
 
     // TODO these could be replaced with a max sized stack
     internal readonly List<ICommand> _commandHistory;
     internal readonly List<ICommand> _redoHistory;
-        
-    public Mediator(ILogger<Mediator> logger)
+
+    private ICommandHandler GetCommandHandlerFor<TCommand>()
+        where TCommand : class, ICommand
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        var handler = _serviceProvider.GetService(typeof(ICommandHandler<TCommand>)) as ICommandHandler;
 
-        if (CommandHistoryMaxSize <= 0)
+        if (handler == null)
         {
-            throw new InvalidOperationException($"Cannot build a Mediator with a CommandHistoryMaxSize of {CommandHistoryMaxSize}");
+            throw new NotImplementedException($"Missing command handler for {typeof(TCommand).FullName}.");
         }
-        if (CommandRedoHistoryMaxSize <= 0)
-        {
-            throw new InvalidOperationException($"Cannot build a Mediator with a CommandRedoHistoryMaxSize of {CommandRedoHistoryMaxSize}");
-        }
-        _commandHistory = new List<ICommand>(CommandHistoryMaxSize);
-        _redoHistory = new List<ICommand>(CommandRedoHistoryMaxSize);
 
-        ScanAssemblies();
-        SanityCheck();
+        return handler;
     }
 
-    internal void ScanAssemblies()
+    private ICommandHandler GetCommandHandlerFor<TCommand, TResponse>()
+        where TCommand : class, ICommand<TResponse>
     {
-        _logger.LogInformation("Mediator is scanning application for commands.");
+        var handler = _serviceProvider.GetService(typeof(ICommandHandler<TCommand, TResponse>)) as ICommandHandler;
 
-        var assembliesToScan = ShouldScanAutomatically 
-            ? AppDomain.CurrentDomain.GetAssemblies() 
-            : Array.Empty<Assembly>();
-        
-        if (AdditionalAssemblies != null && AdditionalAssemblies.Length != 0)
+        if (handler == null)
         {
-            assembliesToScan = assembliesToScan.Union(AdditionalAssemblies).ToArray();
+            throw new NotImplementedException($"Missing command handler for {typeof(TCommand).FullName}.");
         }
 
-        foreach (var assembly in assembliesToScan)
-        {
-            _logger.LogDebug($"Mediator is scanning '{0}' assembly looking for commands", assembly.FullName);
-            try
-            {
-                foreach (var implementationType in assembly.GetTypes())
-                {
-                    if (!implementationType.GetTypeInfo().IsAbstract)
-                    {
-                        foreach (var interfaceType in implementationType.GetInterfaces())
-                        {
-                            if (interfaceType == typeof(ICommand))
-                            {
-                                _logger.LogInformation(
-                                    $"MediatorBase found the '{implementationType.FullName}' command.");
-                                RegisterCommand(implementationType);
-                            }
-                            
-                            else if (interfaceType == typeof(IQuery))
-                            {
-                                _logger.LogInformation(
-                                    $"Mediator found the '{implementationType.FullName}' query.");
-                                RegisterQuery(implementationType);
-                            }
-                            
-                            else if (interfaceType.IsGenericType &&
-                                     interfaceType.GetGenericTypeDefinition() == typeof(ICommandHandler<>))
-                            {
-                                var commandType = interfaceType.GetGenericArguments().Single();
-                                _logger.LogInformation(
-                                    $"Mediator found the '{implementationType.FullName}' command handler to handle {commandType.FullName}.");
-                                RegisterCommandHandler(implementationType, commandType);
-                            }
-                            else if (interfaceType.IsGenericType &&
-                                     interfaceType.GetGenericTypeDefinition() == typeof(ICommandHandler<,>))
-                            {
-                                var commandType = interfaceType.GetGenericArguments().First();
-                                _logger.LogInformation(
-                                    $"Mediator found the '{implementationType.FullName}' command handler to handle {commandType.FullName}.");
-                                RegisterCommandHandler(implementationType, commandType);
-                            }
-                            
-                            else if (interfaceType.IsGenericType &&
-                                     interfaceType.GetGenericTypeDefinition() == typeof(IQueryHandler<,>))
-                            {
-                                var queryType = interfaceType.GetGenericArguments().First();
-                                _logger.LogInformation(
-                                    $"Mediator found the '{implementationType.FullName}' query handler to handle {queryType.FullName}.");
-                                RegisterQueryHandler(implementationType, queryType);
-                            }
-                        }
-                    }
-                }
-            }
-            catch (ReflectionTypeLoadException)
-            {
-                _logger.LogWarning($"BaseMediator could not load types from {assembly.FullName}");
-            }
-        }
+        return handler;
     }
 
-    internal void RegisterCommand(Type commandType)
+    private IQueryHandler GetQueryHandlerFor<TQuery, TResponse>()
+        where TQuery : IQuery<TResponse>
     {
-        if (!_commandHandlers.ContainsKey(commandType))
+        var handler = _serviceProvider.GetService(typeof(IQueryHandler<TQuery, TResponse>)) as IQueryHandler;
+
+        if (handler == null)
         {
-            _commandHandlers.Add(commandType, null);
+            throw new NotImplementedException($"Missing query handler for {typeof(TQuery).FullName}");
         }
-        else
-        {
-            _logger.LogWarning(
-                $"Mediator will not register command {commandType.FullName} because it was already known by Mediator.");
-        }
+
+        return handler;
     }
 
-    internal void RegisterQuery(Type queryType)
+    public ICommandResponse? Execute<TCommand>(TCommand command, Func<RequestStatus, bool>? shouldAddCommandToHistory = null)
+        where TCommand : class, ICommand
     {
-        if (!_queryHandlers.ContainsKey(queryType))
-        {
-            _queryHandlers.Add(queryType, null);
-        }
-        else
-        {
-            _logger.LogWarning(
-                $"Mediator will not register query {queryType.FullName} because it was already known by Mediator.");
-        }
-    }
+        var handler = GetCommandHandlerFor<TCommand>();
 
-    internal void RegisterCommandHandler(Type commandHandlerType, Type commandType)
-    {
-        if (_commandHandlers.TryGetValue(commandType, out var registeredHandler))
-        {
-            if (registeredHandler != null)
-            {
-                _logger.LogWarning(
-                    $"Mediator will override command handler {registeredHandler.GetType().FullName} with {commandHandlerType.FullName} " +
-                    $"as the handler for {commandType.FullName} since a new value was found by Mediator");
-            }
-        }
+        var response = handler.Execute(command);
 
-        _commandHandlers[commandType] = Activator.CreateInstance(commandHandlerType) as ICommandHandler;
-    }
-
-    internal void RegisterQueryHandler(Type queryHandlerType, Type queryType)
-    {
-        if (_queryHandlers.TryGetValue(queryType, out var registeredHandler))
-        {
-            if (registeredHandler != null)
-            {
-                _logger.LogWarning(
-                    $"Mediator will override query handler {registeredHandler.GetType().FullName} with {queryHandlerType.FullName} " +
-                    $"as the handler for {queryType.FullName} since a new value was found by Mediator");
-            }
-        }
-
-        _queryHandlers[queryType] = Activator.CreateInstance(queryHandlerType) as IQueryHandler;
-    }
-
-    internal void SanityCheck()
-    {
-        if ((HasSomeCommandsWithoutHandler() || HasSomeQueriesWithoutHandler()) && ThrowsOnMissingHandler)
-        {
-            _logger.LogError("There is at least 1 missing handler for a command or a query, and the flag to throw on that condition is set.");
-            throw new NotImplementedException("There is at least 1 missing handler for a command or a query, and the flag to throw on that condition is set.");
-        }
-    }
-
-    private bool HasSomeCommandsWithoutHandler()
-    {
-        var missingAtLeastOne = false;
-
-        foreach (var (commandType, handlerType) in _commandHandlers)
-        {
-            if (handlerType == null)
-            {
-                _logger.LogWarning($"Did not find a corresponding handler for command {commandType.FullName}.");
-                missingAtLeastOne = true;
-            }
-        }
-        return missingAtLeastOne;
-    }
-
-    private bool HasSomeQueriesWithoutHandler()
-    {
-        var missingAtLeastOne = false;
-        
-        foreach (var (queryType, handlerType) in _queryHandlers)
-        {
-            if (handlerType == null)
-            {
-                _logger.LogWarning($"Did not find a corresponding handler for query {queryType.FullName}.");
-                missingAtLeastOne = true;
-            }
-        }
-        return missingAtLeastOne;
-    }
-
-    internal ICommandHandler GetCommandHandlerFor(Type commandType)
-    {
-        if (_commandHandlers.TryGetValue(commandType, out var handler) && handler != null)
-        {
-            return handler;
-        }
-        throw new NotImplementedException($"Missing command handler for {commandType.FullName}.");
-    }
-
-    internal IQueryHandler GetQueryHandlerFor(Type queryType)
-    {
-        if (_queryHandlers.TryGetValue(queryType, out var handler) && handler != null)
-        {
-            return handler;
-        }
-        throw new NotImplementedException($"Missing query handler for {queryType.FullName}");
-    }
-
-    public ICommandResponse Execute(ICommand command, Func<RequestStatus, bool>? shouldAddCommandToHistory = null)
-    {
-        var handler = GetCommandHandlerFor(command.GetType());
-        var response = handler.Execute(command, this);
-     
         if (shouldAddCommandToHistory != null && shouldAddCommandToHistory(response.Status))
         {
             AddCommandToHistory(command);
@@ -244,23 +87,32 @@ public class Mediator : IUndoableMediator
         return response;
     }
 
-    public ICommandResponse<TResponse>? Execute<TResponse>(ICommand<TResponse> command,
-        Func<RequestStatus, bool>? shouldAddCommandToHistory = null)
+    public ICommandResponse<TCommandResponse>? Execute<TCommand, TCommandResponse>(TCommand command, Func<RequestStatus, bool>? shouldAddCommandToHistory = null)
+        where TCommand : class, ICommand<TCommandResponse>
     {
-        var handler = GetCommandHandlerFor(command.GetType());
-        var response = handler.Execute(command, this) as ICommandResponse<TResponse>;
-        
-        if (shouldAddCommandToHistory != null && shouldAddCommandToHistory(response!.Status))
+        var handler = GetCommandHandlerFor<TCommand, TCommandResponse>();
+
+        var response = handler.Execute(command);
+     
+        if (shouldAddCommandToHistory != null && shouldAddCommandToHistory(response.Status))
         {
             AddCommandToHistory(command);
         }
 
-        return response;
+        return response as ICommandResponse<TCommandResponse>;
+    }
+
+
+    public IQueryResponse<TResponse>? Execute<TQuery, TResponse>(TQuery query)
+        where TQuery : IQuery<TResponse>
+    {
+        var handler = GetQueryHandlerFor<TQuery, TResponse>();
+        return handler.Execute(query) as IQueryResponse<TResponse>;
     }
 
     private void AddCommandToHistory(ICommand command)
     {
-        if (_commandHistory.Count == CommandHistoryMaxSize)
+        if (_commandHistory.Count == _commandHistoryMaxSize)
         {
             _commandHistory.Remove(_commandHistory.First());
         }
@@ -280,24 +132,28 @@ public class Mediator : IUndoableMediator
         _commandHistory.Add(command);
     }
 
-    public IQueryResponse<T>? Execute<T>(IQuery<T> query)
-    {
-        var handler = GetQueryHandlerFor(query.GetType());
-        _logger.LogDebug("Executing query of type {0}", query.GetType().FullName);
-        return handler.Execute(query) as IQueryResponse<T>;
-    }
-
     public void Undo(ICommand command)
     {
-        if (_commandHandlers.TryGetValue(command.GetType(), out var genericHandler) && genericHandler != null)
+        ICommandHandler handler = null;
+
+        foreach (var interfaceType in command.GetType().GetInterfaces())
         {
-            _logger.LogDebug("Undoing command of type {0}", command.GetType().FullName);
-            genericHandler.Undo(command, this);
+            if (interfaceType == typeof(ICommand))
+            {
+                var methodInfo = typeof(Mediator).GetMethods(BindingFlags.NonPublic | BindingFlags.Instance).First(x => x.Name == nameof(GetCommandHandlerFor) && x.GetGenericArguments().Length == 1);
+                var closedGenericMethod = methodInfo.MakeGenericMethod(command.GetType());
+                handler = closedGenericMethod.Invoke(this, null) as ICommandHandler;
+                break;
+            }
+            else if (interfaceType.GetGenericTypeDefinition() == typeof(ICommand<>))
+            {
+                var methodInfo = typeof(Mediator).GetMethods(BindingFlags.NonPublic | BindingFlags.Instance).First(x => x.Name == nameof(GetCommandHandlerFor) && x.GetGenericArguments().Length == 2);
+                var closedGenericMethod = methodInfo.MakeGenericMethod(command.GetType(), interfaceType.GenericTypeArguments[0]);
+                handler = closedGenericMethod.Invoke(this, null) as ICommandHandler;
+                break;
+            }
         }
-        else
-        {
-            throw new NotImplementedException($"Missing command handler for {command.GetType().FullName}.");
-        }
+        handler.Undo(command);
     }
 
     public bool UndoLastCommand()
@@ -327,6 +183,8 @@ public class Mediator : IUndoableMediator
         
         // we can't let Execute add it back to the history because that would prune the redo history,
         // which is not needed when redoing commands from the redo historys
+
+        // TODO This should be specified with closed geneircs again
         Execute(lastCommandUndone, (_) => false);
         MoveLastCommandFromRedoHistoryToHistory();
         

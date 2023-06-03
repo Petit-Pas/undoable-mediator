@@ -5,7 +5,11 @@ namespace UndoableMediator.TestModels;
 
 public class ChangeAgeCommandHandler : CommandHandlerBase<ChangeAgeCommand>
 {
-    public override CommandResponse Execute(ChangeAgeCommand command, IUndoableMediator _)
+    public ChangeAgeCommandHandler(IUndoableMediator mediator) : base(mediator)
+    {
+    }
+
+    public override CommandResponse Execute(ChangeAgeCommand command)
     {
         command.OldAge = AffectedObject.Age;
         AffectedObject.Age = command.NewAge;
@@ -13,9 +17,9 @@ public class ChangeAgeCommandHandler : CommandHandlerBase<ChangeAgeCommand>
         return CommandResponse.Success();
     }
 
-    public override void Undo(ChangeAgeCommand command, IUndoableMediator mediator)
+    public override void Undo(ChangeAgeCommand command)
     {
-        base.Undo(command, mediator);
+        base.Undo(command);
         AffectedObject.Age = command.OldAge;
     }
 }

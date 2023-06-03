@@ -6,10 +6,14 @@ namespace UndoableMediator.TestModels;
 
 public class CancelableCommandHandler : CommandHandlerBase<CancelableCommand>
 {
-    public override CommandResponse Execute(CancelableCommand command, IUndoableMediator mediator)
+    public CancelableCommandHandler(IUndoableMediator mediator) : base(mediator)
+    {
+    }
+
+    public override CommandResponse Execute(CancelableCommand command)
     {
         var query = new CancelableQuery(command.ShouldBeCanceled);
-        var result = mediator.Execute(query);
+        var result = _mediator.Execute<CancelableQuery, bool>(query);
 
         if (result == null)
         {
