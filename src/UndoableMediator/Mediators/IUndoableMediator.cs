@@ -6,14 +6,9 @@ namespace UndoableMediator.Mediators;
 
 public interface IUndoableMediator
 {
-    ICommandResponse Execute<TCommand>(TCommand command, Func<RequestStatus, bool>? shouldAddCommandToHistory = null)
-        where TCommand : class, ICommand;
+    ICommandResponse<TResponse> Execute<TResponse>(ICommand<TResponse> command, Func<RequestStatus, bool>? shouldAddCommandToHistory = null);
 
-    ICommandResponse<TCommandResponse> Execute<TCommand, TCommandResponse>(TCommand command, Func<RequestStatus, bool>? shouldAddCommandToHistory = null)
-        where TCommand : class, ICommand<TCommandResponse>;
-
-    IQueryResponse<TResponse> Execute<TQuery, TResponse>(TQuery query)
-        where TQuery : IQuery<TResponse>;
+    IQueryResponse<TResponse> Execute<TResponse>(IQuery<TResponse> query);
 
     void Undo(ICommand command);
 
@@ -31,9 +26,13 @@ public interface IUndoableMediator
     ///     It is very important that the handler knows if it needs to requery the data, or store the result of the query in the command for later usage.
     /// </summary>
     /// <returns></returns>
-    bool Redo();
+    bool RedoLastUndoneCommand();
+
+    void Redo(ICommand command);
 
     public int HistoryLength { get; }
+
+    public int RedoHistoryLength { get; }
 
     public static bool AddAlways(RequestStatus _) => true;
     public static bool AddNever(RequestStatus _) => false;

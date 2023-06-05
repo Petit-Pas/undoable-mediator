@@ -12,11 +12,11 @@ public class SetRandomAgeCommandHandler : CommandHandlerBase<SetRandomAgeCommand
     public override CommandResponse<int> Execute(SetRandomAgeCommand command)
     {
         var randomAgeQuery = new RandomIntQuery();
-        var age = _mediator.Execute<RandomIntQuery, int>(randomAgeQuery);
+        var age = _mediator.Execute(randomAgeQuery);
         var changeAgeCommand = new ChangeAgeCommand(age?.Response ?? 0);
         _mediator.Execute(changeAgeCommand);
         command.AddToSubCommands(changeAgeCommand);
 
-        return CommandResponse<int>.Success(age?.Response ?? 0);
+        return CommandResponse.Success(age?.Response ?? 0);
     }
 }

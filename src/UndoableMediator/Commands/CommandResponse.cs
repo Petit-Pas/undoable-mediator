@@ -2,36 +2,41 @@
 
 namespace UndoableMediator.Commands;
 
-public class CommandResponse<TResponse> : CommandResponse, ICommandResponse<TResponse>
+public class CommandResponse<TResponse> : ICommandResponse<TResponse>
 {
-    private CommandResponse(TResponse response, RequestStatus status) : base(status)
+    internal CommandResponse(TResponse? response, RequestStatus status)
     {
         Response = response;
+        Status = status;
     }
-
-    public static CommandResponse<TResponse> Canceled(TResponse response)
-    {
-        return new CommandResponse<TResponse>(response, RequestStatus.Canceled);
-    }
-
-    public static CommandResponse<TResponse> Success(TResponse response)
-    {
-        return new CommandResponse<TResponse>(response, RequestStatus.Success);
-    }
-
-    public static CommandResponse<TResponse> Failed(TResponse response)
-    {
-        return new CommandResponse<TResponse>(response, RequestStatus.Failed);
-    }
-
+    
     public TResponse? Response { get; }
+
+    public RequestStatus Status { get; }
 }
 
-public class CommandResponse : ICommandResponse
+/// <summary>
+///     Only serves the purpose of containing build method to ease the client code
+/// </summary>
+public class CommandResponse : CommandResponse<NoResponse>
 {
-    internal CommandResponse(RequestStatus status)
+    private CommandResponse(RequestStatus status) : base(NoResponse.Value, status)
     {
-        Status = status;
+    }
+
+    public static CommandResponse<TContent> Canceled<TContent>(TContent? response = default)
+    {
+        return new CommandResponse<TContent>(response, RequestStatus.Canceled);
+    }
+
+    public static CommandResponse<TContent> Success<TContent>(TContent? response = default)
+    {
+        return new CommandResponse<TContent>(response, RequestStatus.Success);
+    }
+
+    public static CommandResponse<TContent> Failed<TContent>(TContent? response = default)
+    {
+        return new CommandResponse<TContent>(response, RequestStatus.Failed);
     }
 
     public static CommandResponse Canceled()
@@ -48,6 +53,4 @@ public class CommandResponse : ICommandResponse
     {
         return new CommandResponse(RequestStatus.Failed);
     }
-
-    public RequestStatus Status { get; }
 }

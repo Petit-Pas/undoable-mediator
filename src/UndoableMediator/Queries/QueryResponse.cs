@@ -4,7 +4,7 @@ namespace UndoableMediator.Queries;
 
 public class QueryResponse<T> : IQueryResponse<T>
 {
-    private QueryResponse(T response, RequestStatus status)
+    internal QueryResponse(T response, RequestStatus status)
     {
         Response = response;
         Status = status;

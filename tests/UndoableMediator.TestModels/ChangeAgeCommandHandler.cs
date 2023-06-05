@@ -22,4 +22,9 @@ public class ChangeAgeCommandHandler : CommandHandlerBase<ChangeAgeCommand>
         base.Undo(command);
         AffectedObject.Age = command.OldAge;
     }
+
+    public override void Redo(ChangeAgeCommand command)
+    {
+        Execute(command);
+    }
 }

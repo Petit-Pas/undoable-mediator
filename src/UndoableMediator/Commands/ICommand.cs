@@ -2,10 +2,6 @@
 
 public interface ICommand<TResponse> : ICommand
 {
-}
-
-public interface ICommand
-{
     /// <summary>
     ///     This will only be used through AddToSubCommands for when a command should be considered the parent of another.
     /// </summary>
@@ -16,5 +12,9 @@ public interface ICommand
     /// </summary>
     /// <param name="command"></param>
     void AddToSubCommands(CommandBase command);
+}
+
+public interface ICommand
+{
 }
 

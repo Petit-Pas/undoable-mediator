@@ -1,5 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using System.Reflection;
 using UndoableMediator.Commands;
 using UndoableMediator.DependencyInjection;
@@ -26,107 +25,59 @@ public class Mediator : IUndoableMediator
     }
 
     // Config
-    private int _commandHistoryMaxSize { get; set; }
-    private int _commandRedoHistoryMaxSize { get; set; }
+    internal int _commandHistoryMaxSize { get; set; }
+    internal int _commandRedoHistoryMaxSize { get; set; }
 
     // TODO these could be replaced with a max sized stack
     internal readonly List<ICommand> _commandHistory;
     internal readonly List<ICommand> _redoHistory;
 
-    private ICommandHandler GetCommandHandlerFor<TCommand>()
-        where TCommand : class, ICommand
+    private ICommandHandler GetCommandHandlerFor<TResponse>(ICommand<TResponse> command)
     {
-        var handler = _serviceProvider.GetService(typeof(ICommandHandler<TCommand>)) as ICommandHandler;
+        var commandHandlerType = typeof(ICommandHandler<,>).MakeGenericType(command.GetType(), typeof(TResponse));
+
+        var handler = _serviceProvider.GetService(commandHandlerType) as ICommandHandler;
 
         if (handler == null)
         {
-            throw new NotImplementedException($"Missing command handler for {typeof(TCommand).FullName}.");
+            throw new NotImplementedException($"Missing command handler for {command.GetType().FullName}.");
         }
 
         return handler;
     }
 
-    private ICommandHandler GetCommandHandlerFor<TCommand, TResponse>()
-        where TCommand : class, ICommand<TResponse>
+    private IQueryHandler GetQueryHandlerFor<TResponse>(IQuery<TResponse> query)
     {
-        var handler = _serviceProvider.GetService(typeof(ICommandHandler<TCommand, TResponse>)) as ICommandHandler;
+        var queryHandlerType = typeof(IQueryHandler<,>).MakeGenericType(query.GetType(), typeof(TResponse));
+
+        var handler = _serviceProvider.GetService(queryHandlerType) as IQueryHandler;
 
         if (handler == null)
         {
-            throw new NotImplementedException($"Missing command handler for {typeof(TCommand).FullName}.");
+            throw new NotImplementedException($"Missing query handler for {query.GetType().FullName}.");
         }
 
         return handler;
     }
 
-    private IQueryHandler GetQueryHandlerFor<TQuery, TResponse>()
-        where TQuery : IQuery<TResponse>
+    public ICommandResponse<TResponse> Execute<TResponse>(ICommand<TResponse> command, Func<RequestStatus, bool>? shouldAddCommandToHistory = null)
     {
-        var handler = _serviceProvider.GetService(typeof(IQueryHandler<TQuery, TResponse>)) as IQueryHandler;
+        var handler = GetCommandHandlerFor(command);
 
-        if (handler == null)
-        {
-            throw new NotImplementedException($"Missing query handler for {typeof(TQuery).FullName}");
-        }
-
-        return handler;
-    }
-
-    public ICommandResponse Execute(ICommand command, ICommandHandler commandHandler, Func<RequestStatus, bool>? shouldAddCommandToHistory = null)
-    {
-        var response = commandHandler.Execute(command);
+        var response = handler.Execute(command);
 
         if (shouldAddCommandToHistory != null && shouldAddCommandToHistory(response.Status))
         {
             AddCommandToHistory(command);
         }
-        return response;
-    }
-
-    public ICommandResponse Execute<TCommand>(TCommand command, Func<RequestStatus, bool>? shouldAddCommandToHistory = null)
-        where TCommand : class, ICommand
-    {
-        var handler = GetCommandHandlerFor<TCommand>();
-
-        return Execute(command, handler, shouldAddCommandToHistory);
-    }
-
-    public ICommandResponse<TCommandResponse> Execute<TCommand, TCommandResponse>(TCommand command, Func<RequestStatus, bool>? shouldAddCommandToHistory = null)
-        where TCommand : class, ICommand<TCommandResponse>
-    {
-        var handler = GetCommandHandlerFor<TCommand, TCommandResponse>();
-
-        return (ICommandResponse<TCommandResponse>)Execute(command, handler, shouldAddCommandToHistory);
+        return (ICommandResponse<TResponse>)response;
     }
 
 
-    public IQueryResponse<TResponse>? Execute<TQuery, TResponse>(TQuery query)
-        where TQuery : IQuery<TResponse>
+    public IQueryResponse<TResponse> Execute<TResponse>(IQuery<TResponse> query)
     {
-        var handler = GetQueryHandlerFor<TQuery, TResponse>();
-        return handler.Execute(query) as IQueryResponse<TResponse>;
-    }
-
-    private void AddCommandToHistory(ICommand command)
-    {
-        if (_commandHistory.Count == _commandHistoryMaxSize)
-        {
-            _commandHistory.Remove(_commandHistory.First());
-        }
-
-        _commandHistory.Add(command);
-        _redoHistory.Clear();
-    }
-
-    private void MoveLastCommandFromRedoHistoryToHistory()
-    {
-        if (_redoHistory.Count == 0)
-        {
-            return;
-        }
-        var command = _redoHistory.Last();
-        _redoHistory.Remove(command);
-        _commandHistory.Add(command);
+        var handler = GetQueryHandlerFor(query);
+        return (IQueryResponse<TResponse>)handler.Execute(query);
     }
 
     public void Undo(ICommand command)
@@ -135,16 +86,17 @@ public class Mediator : IUndoableMediator
 
         foreach (var interfaceType in command.GetType().GetInterfaces())
         {
-            if (interfaceType == typeof(ICommand))
+            if (interfaceType.GetGenericTypeDefinition() == typeof(ICommand<>))
             {
-                var methodInfo = GetPrivateMethodByReflection<Mediator>(nameof(GetCommandHandlerFor), 1, command.GetType());
-                handler = methodInfo.Invoke(this, null) as ICommandHandler;
-                break;
-            }
-            else if (interfaceType.GetGenericTypeDefinition() == typeof(ICommand<>))
-            {
-                var methodInfo = GetPrivateMethodByReflection<Mediator>(nameof(GetCommandHandlerFor), 2, command.GetType(), interfaceType.GenericTypeArguments[0]);
-                handler = methodInfo.Invoke(this, null) as ICommandHandler;
+                var methodInfo = GetPrivateMethodByReflection<Mediator>(nameof(GetCommandHandlerFor), 1, interfaceType.GenericTypeArguments[0]);
+                try
+                {
+                    handler = methodInfo.Invoke(this, new object[] { command }) as ICommandHandler;
+                }
+                catch (TargetInvocationException e)
+                {
+                    throw e.InnerException ?? e;
+                }
                 break;
             }
         }
@@ -172,7 +124,35 @@ public class Mediator : IUndoableMediator
         return true;
     }
 
-    public bool Redo()
+    public void Redo(ICommand command)
+    {
+        ICommandHandler? handler = null;
+
+        foreach (var interfaceType in command.GetType().GetInterfaces())
+        {
+            if (interfaceType.GetGenericTypeDefinition() == typeof(ICommand<>))
+            {
+                var methodInfo = GetPrivateMethodByReflection<Mediator>(nameof(GetCommandHandlerFor), 1, interfaceType.GenericTypeArguments[0]);
+                try
+                {
+                    handler = methodInfo.Invoke(this, new object[] { command }) as ICommandHandler;
+                }
+                catch (TargetInvocationException e)
+                {
+                    throw e.InnerException ?? e;
+                }
+                break;
+            }
+        }
+        if (handler == null)
+        {
+            throw new NotImplementedException($"Could not find a handler for command of type {command.GetType().FullName}");
+        }
+
+        handler.Redo(command);
+    }
+
+    public bool RedoLastUndoneCommand()
     {
         if (_redoHistory.Count == 0) 
         {
@@ -181,38 +161,44 @@ public class Mediator : IUndoableMediator
 
         var lastCommandUndone = _redoHistory.Last();
 
-        // we can't let Execute add it back to the history because that would prune the redo history,
-        // which is not needed when redoing commands from the redo historys
-
-        foreach (var interfaceType in lastCommandUndone.GetType().GetInterfaces())
-        {
-            if (interfaceType == typeof(ICommand))
-            {
-                var methodInfo = GetPrivateMethodByReflection<Mediator>(nameof(Execute), 1, lastCommandUndone.GetType());
-                methodInfo.Invoke(this, new object[] {lastCommandUndone, new Func<RequestStatus, bool> ((_) => false)});
-                break;
-            }
-            else if (interfaceType.GetGenericTypeDefinition() == typeof(ICommand<>))
-            {
-                var methodInfo = GetPrivateMethodByReflection<Mediator>(nameof(Execute), 2, lastCommandUndone.GetType(), interfaceType.GenericTypeArguments[0]);
-                methodInfo.Invoke(this, new object[] { lastCommandUndone, new Func<RequestStatus, bool> ((_) => false) });
-                break;
-            }
-        }
+        Redo(lastCommandUndone);
 
         MoveLastCommandFromRedoHistoryToHistory();
         
         return true;
     }
 
+    private void AddCommandToHistory(ICommand command)
+    {
+        if (_commandHistory.Count == _commandHistoryMaxSize)
+        {
+            _commandHistory.Remove(_commandHistory.First());
+        }
+
+        _commandHistory.Add(command);
+        _redoHistory.Clear();
+    }
+
+    private void MoveLastCommandFromRedoHistoryToHistory()
+    {
+        if (_redoHistory.Count == 0)
+        {
+            return;
+        }
+        var command = _redoHistory.Last();
+        _redoHistory.Remove(command);
+        _commandHistory.Add(command);
+    }
+
     public int HistoryLength => _commandHistory.Count;
 
-    /// <summary>
-    ///  These methods could be moved in another class.
-    /// </summary>
-    /// <param name="baseMethod"></param>
-    /// <param name="type1"></param>
-    /// <returns></returns>
+    public int RedoHistoryLength => _redoHistory.Count;
+
+    int IUndoableMediator.HistoryLength => throw new NotImplementedException();
+
+    int IUndoableMediator.RedoHistoryLength => throw new NotImplementedException();
+
+    //  These methods could be moved in another class.
     private MethodInfo GetClosedGenericMethod(MethodInfo baseMethod, Type type1)
     {
         return baseMethod.MakeGenericMethod(type1);

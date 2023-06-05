@@ -1,14 +1,19 @@
 ﻿using System;
 using System.Linq;
+using System.Reflection;
+using System.Reflection.Metadata.Ecma335;
 using FakeItEasy;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using UndoableMediator.Commands;
+using UndoableMediator.DependencyInjection;
 using UndoableMediator.Mediators;
 using UndoableMediator.MissingHandlerDll;
+using UndoableMediator.Queries;
 using UndoableMediator.Requests;
 using UndoableMediator.TestModels;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace UndoableMediator.Tests.Mediators;
 
@@ -16,405 +21,219 @@ namespace UndoableMediator.Tests.Mediators;
 public class MediatorTests
 {
     private ILogger<Mediator> _logger = null!;
+    private IServiceProvider _serviceProvider = null!;
+    private UndoableMediatorOptions _options = null!;
+
+    private Mediator _mediator = null!;
 
     [OneTimeSetUp]
     public void OneTimeSetup()
     {
         _logger = A.Fake<ILogger<Mediator>>();
+        _serviceProvider = A.Fake<IServiceProvider>();
+        _options = new UndoableMediatorOptions()
+        {
+            AssembliesToScan = Array.Empty<Assembly>(),
+            CommandHistoryMaxSize = 10,
+            RedoHistoryMaxSize = 10,
+            ShouldScanAutomatically = false,
+        };
+
+        _mediator = new Mediator(_logger, _serviceProvider, _options);
+    }
+
+
+    // Execute
+    private Action ExecutingCommand<TResponse>(ICommand<TResponse> command)
+    {
+        return () => _mediator.Execute(command, IUndoableMediator.AddNever);
+    }
+
+    private Action ExecutingQuery<TResponse>(IQuery<TResponse> command)
+    {
+        return () => _mediator.Execute(command);
+    }
+
+    // Undo
+    private Action UndoingCommand<TResponse>(ICommand<TResponse> command)
+    {
+        return () => _mediator.Undo(command);
+    }
+
+    // Redo
+    private Action RedoingCommand<TResponse>(ICommand<TResponse> command)
+    {
+        return () => _mediator.Redo(command);
     }
 
     [TestFixture]
     public class MissingHandlerTests : MediatorTests
     {
+        // Execute
+        [Test]
+        public void Should_Throw_Not_Implemented_Exception_When_Executing_An_Unknown_Command()
+        {
+            // Arrange
+            A.CallTo(() => _serviceProvider.GetService(typeof(ICommandHandler<ChangeAgeCommand, NoResponse>)))
+                .Returns(null);
+
+            // Act & Assert
+            ExecutingCommand(new ChangeAgeCommand(12))
+                .Should()
+                .Throw<NotImplementedException>();
+        }
+
+        [Test]
+        public void Should_Throw_Not_Implemented_Exception_When_Executing_An_Unknown_Query()
+        {
+            // Arrange
+            A.CallTo(() => _serviceProvider.GetService(typeof(IQueryHandler<CancelableQuery, bool>)))
+                .Returns(null);
+
+            // Act & Assert
+            ExecutingQuery(new CancelableQuery(true))
+                .Should()
+                .Throw<NotImplementedException>();
+        }
+
+        // Undo
+        [Test]
+        public void Should_Throw_Not_Implemented_Exception_When_Undoing_An_Unknown_Command()
+        {
+            // Arrange
+            A.CallTo(() => _serviceProvider.GetService(typeof(ICommandHandler<ChangeAgeCommand, NoResponse>)))
+                .Returns(null);
+
+            // Act & Assert
+            UndoingCommand(new ChangeAgeCommand(12))
+                .Should()
+                .Throw<NotImplementedException>();
+        }
+
+        // Redo
+        [Test]
+        public void Should_Throw_Not_Implemented_Exception_When_Redoing_An_Unknown_Command()
+        {
+            // Arrange
+            A.CallTo(() => _serviceProvider.GetService(typeof(ICommandHandler<ChangeAgeCommand, NoResponse>)))
+                .Returns(null);
+
+            // Act & Assert
+            RedoingCommand(new ChangeAgeCommand(12))
+                .Should()
+                .Throw<NotImplementedException>();
+        }
+    }
+
+    [TestFixture]
+    public class ExecuteCommandTests : MediatorTests
+    {
+        ICommandHandler<CancelableCommand, bool> _commandHandler = null!;
+        CancelableCommand _command = null!;
+
+        RequestStatus _requestStatus = RequestStatus.Success;
+        bool _requestAnswer = true;
+
         [SetUp]
         public void Setup()
         {
-            Mediator.ShouldScanAutomatically = false;
-            Mediator.AdditionalAssemblies = new[] { typeof(CommandWithoutHandler).Assembly };
-            Mediator.ThrowsOnMissingHandler = false;
+            _commandHandler = A.Fake<ICommandHandler<CancelableCommand, bool>>();
+            _command = new CancelableCommand(false);
+
+            A.CallTo(() => _serviceProvider.GetService(typeof(ICommandHandler<CancelableCommand, bool>)))
+                .Returns(_commandHandler);
+            A.CallTo(() => _commandHandler.Execute(A<ICommand<bool>>._))
+                .ReturnsLazily(() => new CommandResponse<bool>(_requestAnswer, _requestStatus));
+
         }
 
         [Test]
-        public void Should_Only_Warn_When_ThrowsOnMissingHandler_Is_Set_To_False()
+        public void Should_Call_Execute_Method_Of_Handler()
         {
             // Arrange
-            var building = () => _ = new Mediator(_logger);
+            // Act
+            _mediator.Execute(_command);
+
+            // Assert
+            A.CallTo(() => _commandHandler.Execute(A<ICommand<bool>>._))
+                .MustHaveHappenedOnceExactly();
+        }
+
+        [Test]
+        [TestCase(RequestStatus.Success, false)]
+        [TestCase(RequestStatus.Canceled, true)]
+        public void Should_Return_CommandStatus(RequestStatus expectedRequestStatus, bool commandShouldBeCanceled)
+        {
+            // Arrange
+            _requestStatus = expectedRequestStatus;
+
+            // Act
+            var result = _mediator.Execute(_command);
+
+            // Assert
+            result.Status.Should().Be(expectedRequestStatus);
+        }
+
+        [Test]
+        [TestCase(false)]
+        [TestCase(true)]
+        public void Should_Return_Command_Response(bool commandShouldBeCanceled)
+        {
+            // Arrange
+            _requestAnswer = commandShouldBeCanceled;
+
+            // Act
+            var result = _mediator.Execute(_command);
+
+            // Assert
+            result.Response.Should().Be(commandShouldBeCanceled);
+        }
+
+        [Test]
+        [TestCase(null, 0)]
+        [TestCase(false, 0)]
+        [TestCase(true, 1)]
+        public void Should_Add_To_History_When_Requested_Only(bool? shouldAdd, int addedToHistory)
+        {
+            // Arrange
+            var previousHistorySize = _mediator.HistoryLength;
+
+            // Act
+            _mediator.Execute(_command, shouldAdd != null ? (_) => shouldAdd.Value : null);
+
+            // Assert
+            _mediator.HistoryLength.Should().Be(previousHistorySize + addedToHistory);
+        }
+
+        [Test]
+        [TestCase(RequestStatus.Success)]
+        [TestCase(RequestStatus.Failed)]
+        [TestCase(RequestStatus.Canceled)]
+        public void Should_Provide_Request_Status_To_AddToHistory_Delegate(RequestStatus requestStatus)
+        {
+            // Arrange
+            _requestStatus = requestStatus;
 
             // Act & Assert
-            building.Should().NotThrow();
-        }
-
-        [Test]
-        public void Should_Throw_When_ThrowsOnMissingHandler_Is_Set_To_True()
-        {
-            // Arrange
-            Mediator.ThrowsOnMissingHandler = true;
-            var building = () => _ = new Mediator(_logger);
-
-            // Act & Assert
-            building.Should().Throw<NotImplementedException>();
-        }
-
-        [Test]
-        public void Should_Throw_When_Trying_To_Execute_A_Command_That_Has_No_Handler()
-        {
-            // Arrange
-            var mediator = new Mediator(_logger);
-            var command = new CommandWithoutHandler();
-            var executingCommand = () => mediator.Execute(command);
-
-            // Act & Assert
-            executingCommand.Should().Throw<NotImplementedException>();
-        }
-
-        [Test]
-        public void Should_Throw_When_Trying_To_Execute_A_Returning_Command_That_Has_No_Handler()
-        {
-            // Arrange
-            var mediator = new Mediator(_logger);
-            var command = new ReturningCommandWithoutHandler();
-            var executingCommand = () => mediator.Execute(command);
-
-            // Act & Assert
-            executingCommand.Should().Throw<NotImplementedException>();
-        }
-
-        [Test]
-        public void Should_Throw_When_Trying_To_Execute_A_Query_That_Has_No_Handler()
-        {
-            // Arrange
-            var mediator = new Mediator(_logger);
-            var query = new QueryWithoutHandler();
-            var executingQuery = () => mediator.Execute(query);
-
-            // Act & Assert
-            executingQuery.Should().Throw<NotImplementedException>();
-        }
-
-        [Test]
-        public void Should_Throw_When_Trying_To_Undo_A_Command_That_Has_No_Handler()
-        {
-            // Arrange
-            var mediator = new Mediator(_logger);
-            var command = new CommandWithoutHandler();
-            var undoingCommand = () => mediator.Undo(command);
-
-            // Act & Assert
-            undoingCommand.Should().Throw<NotImplementedException>();
-        }
-
-        [Test]
-        public void Should_Throw_When_Trying_To_Undo_A_Returning_Command_That_Has_No_Handler()
-        {
-            // Arrange
-            var mediator = new Mediator(_logger);
-            var command = new ReturningCommandWithoutHandler();
-            var undoingCommand = () => mediator.Undo(command);
-
-            // Act & Assert
-            undoingCommand.Should().Throw<NotImplementedException>();
-        }
-
-    }
-
-    [TestFixture]
-    public class QueryExecuteTests : MediatorTests
-    {
-        private IUndoableMediator _mediator = null!;
-
-        [SetUp]
-        public void SetUp()
-        {
-            Mediator.ShouldScanAutomatically = false;
-            Mediator.AdditionalAssemblies = new[] { typeof(AffectedObject).Assembly };
-            Mediator.ThrowsOnMissingHandler = true;
-
-            _mediator = new Mediator(_logger);
-        }
-
-        [Test]
-        public void Should_Return_A_Query_Response_Success_When_The_Query_Succeeds()
-        {
-            // Arrange
-            var query = new CancelableQuery();
-
-            // Act
-            var result = _mediator.Execute(query);
-
-            // Assert
-            result.Should().NotBeNull();
-            result!.Status.Should().Be(RequestStatus.Success);
-        }
-
-        [Test]
-        public void Should_Return_Cancel_When_The_Query_Is_Canceled()
-        {
-            // Arrange
-            var query = new CancelableQuery(true);
-
-            // Act
-            var result = _mediator.Execute(query);
-
-            // Assert
-            result.Should().NotBeNull();
-            result!.Status.Should().Be(RequestStatus.Canceled);
-        }
-
-        [Test]
-        public void Should_Return_Result_When_Query_Succeeds()
-        {
-            // Arrange
-            var query = new CancelableQuery();
-
-            // Act
-            var result = _mediator.Execute(query);
-
-            // Assert
-            result.Should().NotBeNull();
-            result!.Response.Should().BeTrue();
-        }
-    }
-
-    [TestFixture]
-    public class SimpleCommandExecuteTests : MediatorTests
-    {
-        private IUndoableMediator _mediator = null!;
-
-        [SetUp]
-        public void SetUp()
-        {
-            Mediator.ShouldScanAutomatically = false;
-            Mediator.AdditionalAssemblies = new[] { typeof(AffectedObject).Assembly };
-            Mediator.ThrowsOnMissingHandler = true;
-
-            _mediator = new Mediator(_logger);
-        }
-
-        [Test]
-        public void Should_Return_A_Command_Response_Success_When_The_Command_Succeeds()
-        {
-            // Arrange
-            var command = new CancelableCommand();
-
-            // Act
-            var result = _mediator.Execute(command);
-
-            // Assert
-            result.Should().NotBeNull();
-            result!.Status.Should().Be(RequestStatus.Success);
-        }
-
-        [Test]
-        public void Should_Return_Cancel_When_The_Command_Is_Canceled()
-        {
-            // Arrange
-            var command = new CancelableCommand(true);
-
-            // Act
-            var result = _mediator.Execute(command);
-
-            // Assert
-            result.Should().NotBeNull();
-            result!.Status.Should().Be(RequestStatus.Canceled);
-        }
-
-        [Test]
-        public void Should_Return_Result_When_Command_Succeeds()
-        {
-            // Arrange
-            var command = new SetRandomAgeCommand();
-
-            // Act
-            var result = _mediator.Execute(command);
-
-            // Assert
-            result.Should().NotBeNull();
-            result!.Response.Should().Be(AffectedObject.Age);
-        }
-
-        [Test]
-        public void Should_Have_An_Effect()
-        {
-            // Arrange
-            var previousAge = AffectedObject.Age;
-            var command = new ChangeAgeCommand(previousAge + 10);
-
-            // Act
-            _mediator.Execute(command);
-
-            // Assert
-            AffectedObject.Age.Should().Be(previousAge + 10);
-        }
-    }
-
-    [TestFixture]
-    public class ComplexCommandExecuteTests : MediatorTests
-    {
-        private IUndoableMediator _mediator = null!;
-
-        [SetUp]
-        public void SetUp()
-        {
-            Mediator.ShouldScanAutomatically = false;
-            Mediator.AdditionalAssemblies = new[] { typeof(AffectedObject).Assembly };
-            Mediator.ThrowsOnMissingHandler = true;
-
-            _mediator = new Mediator(_logger);
-        }
-
-        [Test]
-        public void Should_Set_SubCommands_Of_Parent_Command()
-        {
-            // Arrange
-            var command = new SetRandomAgeCommand();
-
-            // Act
-            _mediator.Execute(command);
-
-            // Assert
-            command.SubCommands.Should().Contain(x => x.GetType() == typeof(ChangeAgeCommand));
-        }
-    }
-
-    [TestFixture]
-    public class SimpleCommandUndoTests : MediatorTests
-    {
-        private IUndoableMediator _mediator = null!;
-
-        [SetUp]
-        public void SetUp()
-        {
-            Mediator.ShouldScanAutomatically = false;
-            Mediator.AdditionalAssemblies = new[] { typeof(AffectedObject).Assembly };
-            Mediator.ThrowsOnMissingHandler = true;
-
-            _mediator = new Mediator(_logger);
-        }
-
-        [Test]
-        public void Should_Call_The_Undo_Method_On_The_Handler()
-        {
-            // Arrange
-            var previousName = AffectedObject.Name;
-            var newName = $"Longer {previousName}";
-            var command = new ChangeNameCommand(newName);
-            _mediator.Execute(command);
-            AffectedObject.Name.Should().Be(newName);
-
-            // Act
-            _mediator.Undo(command);
-
-            // Assert
-            AffectedObject.Name.Should().Be(previousName);
-        }
-    }
-
-    [TestFixture]
-    public class ComplexCommandUndoTests : MediatorTests
-    {
-        private IUndoableMediator _mediator = null!;
-
-        [SetUp]
-        public void SetUp()
-        {
-            Mediator.ShouldScanAutomatically = false;
-            Mediator.AdditionalAssemblies = new[] { typeof(AffectedObject).Assembly };
-            Mediator.ThrowsOnMissingHandler = true;
-
-            _mediator = new Mediator(_logger);
-        }
-
-        [Test]
-        public void Should_Call_The_Undo_Method_On_The_SubCommands()
-        {
-            // Arrange
-            var previousName = AffectedObject.Name;
-            var newName = $"Longer {previousName}";
-            var previousAge = AffectedObject.Age;
-            var newAge = previousAge + 10;
-            var command = new ChangeAgeAndNameCommand(newAge, newName);
-            _mediator.Execute(command);
-            AffectedObject.Name.Should().Be(newName);
-            AffectedObject.Age.Should().Be(newAge);
-
-            // Act
-            _mediator.Undo(command);
-
-            // Assert
-            AffectedObject.Name.Should().Be(previousName);
-            AffectedObject.Age.Should().Be(previousAge);
-        }
-    }
-
-    [TestFixture]
-    public class MediatorHistoryTests : MediatorTests
-    {
-        private Mediator _mediator = null!;
-
-        [SetUp]
-        public void SetUp()
-        {
-            Mediator.ShouldScanAutomatically = false;
-            Mediator.AdditionalAssemblies = new[] { typeof(AffectedObject).Assembly };
-            Mediator.ThrowsOnMissingHandler = true;
-
-            _mediator = new Mediator(_logger);
-        }
-
-        [Test]
-        public void Should_Not_Add_Command_To_History_When_Provider_Returns_False()
-        {
-            // Arrange
-            var command = new ChangeAgeCommand(10);
-
-            // Act
-            _mediator.Execute(command);
-
-            // Assert
-            _mediator.HistoryLength.Should().Be(0);
-        }
-
-        [Test]
-        public void Should_Add_Command_To_History_When_Provider_Returns_True()
-        {
-            // Arrange
-            var command = new ChangeAgeCommand(10);
-
-            // Act
-            _mediator.Execute(command, _ => true);
-
-            // Assert
-            _mediator.HistoryLength.Should().Be(1);
-        }
-
-        [Test]
-        [TestCase(false, 1)]
-        [TestCase(true, 0)]
-        public void Should_Use_Provider_To_Determine_When_A_Command_Needs_To_Be_Added_To_History(bool canceled, int expectedHistorySize)
-        {
-            // Arrange
-            var command = new CancelableCommand(canceled);
-
-            // Act
-            _mediator.Execute(command, response => response is RequestStatus.Success);
-
-            // Assert
-            _mediator.HistoryLength.Should().Be(expectedHistorySize);
-        }
-
-        [Test]
-        public void Should_Cycle_Commands_In_History_When_MaxSize_Is_Reached()
-        {
-            // Arrange
-            while (_mediator.HistoryLength != Mediator.CommandHistoryMaxSize) 
+            _mediator.Execute(_command, (status) =>
             {
-                _mediator._commandHistory.Add(new ChangeAgeCommand(12));
+                status.Should().Be(requestStatus);
+                return true;
+            });
+        }
+
+        [Test]
+        public void Should_Roll_Out_A_Command_From_History_When_Max_Limit_Has_Been_Reached()
+        {
+            while (_mediator.HistoryLength != _mediator._commandHistoryMaxSize)
+            {
+                _mediator._commandHistory.Add(new CancelableCommand(false));
             }
             var lastCommand = _mediator._commandHistory.First();
             var nextToLastCommand = _mediator._commandHistory[1];
 
             // Act
-            _mediator.Execute(new ChangeAgeCommand(12), _ => true);
+            _mediator.Execute(new CancelableCommand(false), _ => true);
 
             // Assert
             _mediator._commandHistory.First().Should().Be(nextToLastCommand);
@@ -422,52 +241,260 @@ public class MediatorTests
         }
 
         [Test]
-        public void Should_Undo_Last_Command_Added_To_History()
+        public void Should_Erase_All_Possible_Redo_History()
         {
             // Arrange
-            var previousAge = AffectedObject.Age;
-            var registeredCommand = new ChangeAgeCommand(previousAge + 10);
-            var nonRegisteredCommand = new ChangeAgeCommand(previousAge + 20);
-            _mediator.Execute(registeredCommand, _ => true);
-            _mediator.Execute(nonRegisteredCommand);
+            _mediator._redoHistory.Add(new CancelableCommand(true));
+            _mediator._redoHistory.Add(new CancelableCommand(true));
+            _mediator._redoHistory.Add(new CancelableCommand(true));
 
+            // Act
+            _mediator.Execute(_command, _ => true);
+
+            // Assert
+            _mediator.RedoHistoryLength.Should().Be(0);
+        }
+    }
+
+    [TestFixture]
+    public class ExecuteQueryTests : MediatorTests
+    {
+        IQueryHandler<CancelableQuery, bool> _queryHandler = null!;
+        CancelableQuery _query = null!;
+
+        RequestStatus _requestStatus = RequestStatus.Success;
+        bool _requestAnswer = true;
+
+        [SetUp]
+        public void Setup()
+        {
+            _queryHandler = A.Fake<IQueryHandler<CancelableQuery, bool>>();
+            _query = new CancelableQuery();
+
+            A.CallTo(() => _serviceProvider.GetService(typeof(IQueryHandler<CancelableQuery, bool>)))
+                .Returns(_queryHandler);
+
+            A.CallTo(() => _queryHandler.Execute(A<IQuery<bool>>._))
+                .ReturnsLazily(() => new QueryResponse<bool>(_requestAnswer, _requestStatus));
+        }
+
+        [Test]
+        public void Should_Call_Execute_Method_Of_Handler()
+        {
+            // Arrange
+            // Act
+            _mediator.Execute(_query);
+
+            // Assert
+            A.CallTo(() => _queryHandler.Execute(A<IQuery<bool>>._))
+                .MustHaveHappened();
+        }
+
+        [Test]
+        [TestCase(RequestStatus.Success, false)]
+        [TestCase(RequestStatus.Canceled, true)]
+        public void Should_Return_CommandStatus(RequestStatus expectedRequestStatus, bool commandShouldBeCanceled)
+        {
+            // Arrange
+            _requestStatus = expectedRequestStatus;
+
+            // Act
+            var result = _mediator.Execute(_query);
+
+            // Assert
+            result.Status.Should().Be(expectedRequestStatus);
+        }
+
+        [Test]
+        [TestCase(false)]
+        [TestCase(true)]
+        public void Should_Return_Command_Response(bool queryShouldBeCanceled)
+        {
+            // Arrange
+            _requestAnswer = queryShouldBeCanceled;
+
+            // Act
+            var result = _mediator.Execute(_query);
+
+            // Assert
+            result.Response.Should().Be(queryShouldBeCanceled);
+        }
+    }
+
+    [TestFixture]
+    public class UndoCommandTests : MediatorTests
+    {
+        ICommandHandler<CancelableCommand, bool> _commandHandler = null!;
+        CancelableCommand _command = null!;
+
+        [SetUp]
+        public void Setup()
+        {
+            _commandHandler = A.Fake<ICommandHandler<CancelableCommand, bool>>();
+            _command = new CancelableCommand(false);
+
+            A.CallTo(() => _serviceProvider.GetService(typeof(ICommandHandler<CancelableCommand, bool>)))
+                .Returns(_commandHandler);
+        }
+
+        [Test]
+        public void Should_Call_Undo_Method_Of_Handler()
+        {
+            // Arrange
+            // Act
+            _mediator.Undo(_command);
+
+            // Assert
+            A.CallTo(() => _commandHandler.Undo(A<ICommand<bool>>._))
+                .MustHaveHappenedOnceExactly();
+        }
+    }
+
+    [TestFixture]
+    public class UndoLastCommandTests : MediatorTests
+    {
+        CancelableCommand _lastAddedCommand = null!;
+
+        [SetUp]
+        public void Setup()
+        {
+            var commandHandler = A.Fake<ICommandHandler<CancelableCommand, bool>>();
+
+            A.CallTo(() => _serviceProvider.GetService(typeof(ICommandHandler<CancelableCommand, bool>)))
+                .Returns(commandHandler);
+            A.CallTo(() => commandHandler.Execute(A<ICommand<bool>>._))
+                .ReturnsLazily(() => new CommandResponse<bool>(true, RequestStatus.Success));
+
+
+            _mediator.Execute(new CancelableCommand(false), _ => true);
+            _mediator.Execute(new CancelableCommand(false), _ => true);
+            _mediator.Execute(new CancelableCommand(false), _ => true);
+
+            _lastAddedCommand = (CancelableCommand)_mediator._commandHistory.Last();
+        }
+
+        [Test]
+        public void Should_Return_False_When_History_Is_Empty()
+        {
+            // Arrange
+            _mediator._commandHistory.Clear();
+
+            // Act
+            var result = _mediator.UndoLastCommand();
+
+            // Assert
+            result.Should().BeFalse();
+        }
+
+        [Test]
+        public void Should_Return_True_When_History_Is_Not_Empty()
+        {
+            // Act
+            var result = _mediator.UndoLastCommand();
+
+            // Assert
+            result.Should().BeTrue();
+        }
+
+        [Test]
+        public void Should_Move_Command_From_History_To_Redo_History_When_Undoing()
+        {
             // Act
             _mediator.UndoLastCommand();
 
             // Assert
-            AffectedObject.Age.Should().Be(previousAge);
+            _mediator._commandHistory.Should().NotContain(_lastAddedCommand);
+            _mediator._redoHistory.Should().Contain(_lastAddedCommand);
+        }
+    }
+
+    [TestFixture]
+    public class RedoCommandTests : MediatorTests
+    {
+        ICommandHandler<CancelableCommand, bool> _commandHandler = null!;
+        CancelableCommand _command = null!;
+
+        [SetUp]
+        public void Setup()
+        {
+            _commandHandler = A.Fake<ICommandHandler<CancelableCommand, bool>>();
+            _command = new CancelableCommand(false);
+
+            A.CallTo(() => _serviceProvider.GetService(typeof(ICommandHandler<CancelableCommand, bool>)))
+                .Returns(_commandHandler);
         }
 
         [Test]
-        public void Undo_Should_Add_Command_To_Redo_History()
+        public void Should_Call_Redo_Method_Of_Handler()
         {
             // Arrange
-            var command = new ChangeAgeCommand(10);
-            _mediator.Execute(command, _ => true);
-
             // Act
+            _mediator.Redo(_command);
+
+            // Assert
+            A.CallTo(() => _commandHandler.Redo(A<ICommand<bool>>._))
+                .MustHaveHappenedOnceExactly();
+        }
+    }
+
+    [TestFixture]
+    public class RedoLastUndoneCommandTests : MediatorTests
+    {
+        CancelableCommand _lastUndoneCommand = null!;
+
+        [SetUp]
+        public void Setup()
+        {
+            var commandHandler = A.Fake<ICommandHandler<CancelableCommand, bool>>();
+
+            A.CallTo(() => _serviceProvider.GetService(typeof(ICommandHandler<CancelableCommand, bool>)))
+                .Returns(commandHandler);
+            A.CallTo(() => commandHandler.Execute(A<ICommand<bool>>._))
+                .ReturnsLazily(() => new CommandResponse<bool>(true, RequestStatus.Success));
+
+
+            _mediator.Execute(new CancelableCommand(false), _ => true);
+            _mediator.Execute(new CancelableCommand(false), _ => true);
+            _mediator.Execute(new CancelableCommand(false), _ => true);
+            _mediator.UndoLastCommand();
+            _mediator.UndoLastCommand();
             _mediator.UndoLastCommand();
 
-            // Arrange
-            _mediator._redoHistory.Count.Should().Be(1);
+            _lastUndoneCommand = (CancelableCommand)_mediator._redoHistory.Last();
         }
 
         [Test]
-        public void Should_Redo_Last_Undone_Command()
+        public void Should_Return_False_When_History_Is_Empty()
         {
             // Arrange
-            var previousAge = AffectedObject.Age;
-            var firstCommand = new ChangeAgeCommand(previousAge + 10);
-            var secondCommand = new ChangeAgeCommand(previousAge + 20);
-            _mediator.Execute(firstCommand, _ => true);
-            _mediator.Execute(secondCommand, _ => true);
-            _mediator.UndoLastCommand();
-            _mediator.UndoLastCommand();
+            _mediator._redoHistory.Clear();
 
             // Act
-            _mediator.Redo();
+            var result = _mediator.RedoLastUndoneCommand();
 
-            AffectedObject.Age.Should().Be(previousAge + 10);
+            // Assert
+            result.Should().BeFalse();
+        }
+
+        [Test]
+        public void Should_Return_True_When_History_Is_Not_Empty()
+        {
+            // Act
+            var result = _mediator.UndoLastCommand();
+
+            // Assert
+            result.Should().BeTrue();
+        }
+
+        [Test]
+        public void Should_Move_Command_From_Redo_History_To_History_When_Undoing()
+        {
+            // Act
+            _mediator.RedoLastUndoneCommand();
+
+            // Assert
+            _mediator._commandHistory.Should().Contain(_lastUndoneCommand);
+            _mediator._redoHistory.Should().NotContain(_lastUndoneCommand);
         }
     }
 }

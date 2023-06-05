@@ -2,7 +2,7 @@
 
 namespace UndoableMediator.TestModels;
 
-public class CancelableCommand : CommandBase
+public class CancelableCommand : CommandBase<bool>
 {
     public CancelableCommand()
     {

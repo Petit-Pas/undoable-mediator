@@ -15,13 +15,6 @@ public class UndoableMediatorOptions
     ///     Will be cleared anytime a command is executed and added to the history since it rewrites the whole thing.
     /// </summary>
     public int RedoHistoryMaxSize { get; set; } = 32;
-
-    /// <summary>
-    ///     Whenever the mediator is built, it then scans itself to any command with a missing handler
-    ///     If that flag is set to true, it will throw an exception instead of just warning
-    ///     true by default.
-    /// </summary>
-    public bool ThrowsOnMissingHandler { get; set; } = true;
     
     /// <summary>
     ///     UndoableMediator will do its best to find commands, however, the ways .net core loads assemblies makes it that sometime, your assembly won't be found by AppDomain.CurrentDomain.GetAssemblies();

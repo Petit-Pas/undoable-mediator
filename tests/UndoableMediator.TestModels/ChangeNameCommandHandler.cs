@@ -24,4 +24,9 @@ public class ChangeNameCommandHandler : CommandHandlerBase<ChangeNameCommand>
             AffectedObject.Name = command.OldName;
         }
     }
+
+    public override void Redo(ChangeNameCommand command)
+    {
+        Execute(command);
+    }
 }

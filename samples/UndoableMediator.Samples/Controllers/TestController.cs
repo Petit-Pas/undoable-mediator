@@ -27,7 +27,7 @@ namespace UndoableMediator.Samples.Controllers
         public ActionResult<int> GetInt()
         {
             var command = new RandomIntQuery();
-            var result = _mediator.Execute<RandomIntQuery, int>(command);
+            var result = _mediator.Execute(command);
 
             return Ok(result.Response);
         }
@@ -49,8 +49,10 @@ namespace UndoableMediator.Samples.Controllers
         {
             var command = new SetRandomAgeCommand();
 
-            var result = _mediator.Execute<SetRandomAgeCommand, int>(command, (_) => true);
+            var result = _mediator.Execute(command, IUndoableMediator.AddAlways);
             _mediator.UndoLastCommand();
+
+            _mediator.RedoLastUndoneCommand();
 
             return Ok(result.Response);
         }

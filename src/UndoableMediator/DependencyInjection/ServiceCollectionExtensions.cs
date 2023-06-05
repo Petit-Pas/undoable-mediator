@@ -56,8 +56,7 @@ public static class ServiceCollectionExtensions
                     foreach (var interfaceType in implementationType.GetInterfaces().Where(i => i.IsGenericType))
                     {
                         var genericDefinition = interfaceType.GetGenericTypeDefinition();
-                        if (genericDefinition == typeof(ICommandHandler<>) ||
-                            genericDefinition == typeof(ICommandHandler<,>) ||
+                        if (genericDefinition == typeof(ICommandHandler<,>) ||
                             genericDefinition == typeof(IQueryHandler<,>))
                         {
                             serviceCollection.AddTransient(interfaceType, implementationType);
