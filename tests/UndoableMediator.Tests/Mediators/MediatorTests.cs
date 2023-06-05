@@ -46,7 +46,7 @@ public class MediatorTests
     // Execute
     private Action ExecutingCommand<TResponse>(ICommand<TResponse> command)
     {
-        return () => _mediator.Execute(command, IUndoableMediator.AddNever);
+        return () => _mediator.Execute(command);
     }
 
     private Action ExecutingQuery<TResponse>(IQuery<TResponse> command)

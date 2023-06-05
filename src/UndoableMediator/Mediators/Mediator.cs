@@ -12,7 +12,7 @@ public class Mediator : IUndoableMediator
     private readonly ILogger _logger;
     private readonly IServiceProvider _serviceProvider;
 
-    public Mediator(ILogger<IUndoableMediator> logger, IServiceProvider serviceProvider, UndoableMediatorOptions options)
+    internal Mediator(ILogger<IUndoableMediator> logger, IServiceProvider serviceProvider, UndoableMediatorOptions options)
     {
         _logger = logger;
         _serviceProvider = serviceProvider;
@@ -60,6 +60,7 @@ public class Mediator : IUndoableMediator
         return handler;
     }
 
+    // <inheritdoc />
     public ICommandResponse<TResponse> Execute<TResponse>(ICommand<TResponse> command, Func<RequestStatus, bool>? shouldAddCommandToHistory = null)
     {
         var handler = GetCommandHandlerFor(command);
@@ -74,12 +75,14 @@ public class Mediator : IUndoableMediator
     }
 
 
+    // <inheritdoc />
     public IQueryResponse<TResponse> Execute<TResponse>(IQuery<TResponse> query)
     {
         var handler = GetQueryHandlerFor(query);
         return (IQueryResponse<TResponse>)handler.Execute(query);
     }
 
+    // <inheritdoc />
     public void Undo(ICommand command)
     {
         ICommandHandler? handler = null;
@@ -108,6 +111,7 @@ public class Mediator : IUndoableMediator
         handler.Undo(command);
     }
 
+    // <inheritdoc />
     public bool UndoLastCommand()
     {
         if (_commandHistory.Count == 0)
@@ -124,6 +128,7 @@ public class Mediator : IUndoableMediator
         return true;
     }
 
+    // <inheritdoc />
     public void Redo(ICommand command)
     {
         ICommandHandler? handler = null;
@@ -152,6 +157,7 @@ public class Mediator : IUndoableMediator
         handler.Redo(command);
     }
 
+    // <inheritdoc />
     public bool RedoLastUndoneCommand()
     {
         if (_redoHistory.Count == 0) 

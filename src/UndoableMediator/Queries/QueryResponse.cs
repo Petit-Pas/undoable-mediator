@@ -2,29 +2,53 @@
 
 namespace UndoableMediator.Queries;
 
-public class QueryResponse<T> : IQueryResponse<T>
+/// <summary>
+///     Class that holds a request status and an response for a query
+/// </summary>
+/// <typeparam name="TResponse"> The answer type for the query </typeparam>
+public class QueryResponse<TResponse> : IQueryResponse<TResponse>
 {
-    internal QueryResponse(T response, RequestStatus status)
+    internal QueryResponse(TResponse response, RequestStatus status)
     {
         Response = response;
         Status = status;
     }
 
-    public static QueryResponse<T> Canceled(T response)
+    /// <summary>
+    ///     Creates a QueryResponse with a status of Canceled and the given content
+    /// </summary>
+    /// <typeparam name="TResponse"> Type expected as answer from the query </typeparam>
+    /// <param name="response"> Answer of the query </param>
+    /// <returns> The build QueryResponse </returns>
+    public static QueryResponse<TResponse> Canceled(TResponse response)
     {
-		return new QueryResponse<T>(response, RequestStatus.Canceled);
+		return new QueryResponse<TResponse>(response, RequestStatus.Canceled);
     }
 
-    public static QueryResponse<T> Success(T response)
+    /// <summary>
+    ///     Creates a QueryResponse with a status of Canceled and the given content
+    /// </summary>
+    /// <typeparam name="TResponse"> Type expected as answer from the query </typeparam>
+    /// <param name="response"> Answer of the query </param>
+    /// <returns> The build QueryResponse </returns>
+    public static QueryResponse<TResponse> Success(TResponse response)
     {
-        return new QueryResponse<T>(response, RequestStatus.Success);
+        return new QueryResponse<TResponse>(response, RequestStatus.Success);
     }
 
-    public static QueryResponse<T> Failed(T response)
+    /// <summary>
+    ///     Creates a QueryResponse with a status of Canceled and the given content
+    /// </summary>
+    /// <typeparam name="TResponse"> Type expected as answer from the query </typeparam>
+    /// <param name="response"> Answer of the query </param>
+    /// <returns> The build QueryResponse </returns>
+    public static QueryResponse<TResponse> Failed(TResponse response)
     {
-        return new QueryResponse<T>(response, RequestStatus.Failed);
+        return new QueryResponse<TResponse>(response, RequestStatus.Failed);
     }
 
-    public T? Response { get; }
-	public RequestStatus Status { get; }
+    // <inheritdoc />
+    public TResponse? Response { get; }
+    // <inheritdoc />
+    public RequestStatus Status { get; }
 }

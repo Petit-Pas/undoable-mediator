@@ -2,6 +2,10 @@
 
 namespace UndoableMediator.Commands;
 
+/// <summary>
+///     Base class to use for a command that yields no response
+/// </summary>
+/// <typeparam name="TCommand"> The type of the command to handle </typeparam>
 public abstract class CommandHandlerBase<TCommand> : CommandHandlerBase<TCommand, NoResponse>
     where TCommand : class, ICommand<NoResponse>
 {
@@ -10,17 +14,29 @@ public abstract class CommandHandlerBase<TCommand> : CommandHandlerBase<TCommand
     }
 }
 
+/// <summary>
+///     Base class to use for a command that does yield a response
+/// </summary>
+/// <typeparam name="TCommand"> The type of the command </typeparam>
+/// <typeparam name="TResponse"> The type of the response of the command </typeparam>
 public abstract class CommandHandlerBase<TCommand, TResponse> : ICommandHandler<TCommand, TResponse>
     where TCommand : class, ICommand<TResponse>
 {
+    /// <summary>
+    ///     The mediator instance, can be reused by any command to execute subcommands
+    /// </summary>
     protected readonly IUndoableMediator _mediator;
 
+    /// <summary>
+    ///     Base constructor
+    /// </summary>
+    /// <param name="mediator"> A mediator instance, should be gotten through DI </param>
     public CommandHandlerBase(IUndoableMediator mediator)
     {
         _mediator = mediator;
     }
 
-    //// generic method
+    // <inheritdoc />
     public ICommandResponse Execute(ICommand command)
     {
         if (command is not TCommand castedCommand)
@@ -30,10 +46,10 @@ public abstract class CommandHandlerBase<TCommand, TResponse> : ICommandHandler<
         return Execute(castedCommand);
     }
 
-    //// specialized method, needs to be implemented
+    // <inheritdoc />
     public abstract ICommandResponse<TResponse> Execute(TCommand command);
 
-    // generic method
+    // <inheritdoc />
     public void Undo(ICommand command)
     {
         if (command is not TCommand castedCommand)
@@ -43,7 +59,8 @@ public abstract class CommandHandlerBase<TCommand, TResponse> : ICommandHandler<
         Undo(castedCommand);
     }
 
-    // specialized method, can be overriden but don't forget to keep calling base.Undo() if the command has sub commands to undo them as well
+
+    // <inheritdoc />
     public virtual void Undo(TCommand command)
     {
         UndoSubCommands(command);
@@ -51,9 +68,9 @@ public abstract class CommandHandlerBase<TCommand, TResponse> : ICommandHandler<
 
     /// <summary>
     ///     This method gets called by the Undo() call to the CommandHandlerBase
+    ///     Will simply propagate the Undo call to the potential SubCommands registered
     /// </summary>
-    /// <param name="command"></param>
-    /// <param name="mediator"></param>
+    /// <param name="command"> The command to undo </param>
     private void UndoSubCommands(TCommand command)
     {
         foreach (var subCommand in command.SubCommands)
@@ -62,6 +79,7 @@ public abstract class CommandHandlerBase<TCommand, TResponse> : ICommandHandler<
         }
     }
 
+    // <inheritdoc />
     public void Redo(ICommand command)
     {
         if (command is not TCommand castedCommand)
@@ -71,11 +89,16 @@ public abstract class CommandHandlerBase<TCommand, TResponse> : ICommandHandler<
         Redo(castedCommand);
     }
 
+    // <inheritdoc />
     public virtual void Redo(TCommand command)
     {
         RedoSubCommands(command);
     }
 
+    /// <summary>
+    ///     Will simply propagate the redo call to the porential subCommands registered.
+    /// </summary>
+    /// <param name="command"></param>
     private void RedoSubCommands(TCommand command)
     {
         foreach (var subCommand in command.SubCommands)

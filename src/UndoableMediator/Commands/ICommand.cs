@@ -1,19 +1,27 @@
 ﻿namespace UndoableMediator.Commands;
 
+/// <summary>
+///     Base generic interface for a command
+/// </summary>
+/// <typeparam name="TResponse"> The type of the response expected </typeparam>
 public interface ICommand<TResponse> : ICommand
 {
     /// <summary>
-    ///     This will only be used through AddToSubCommands for when a command should be considered the parent of another.
+    ///     The stack of subCommands
     /// </summary>
     Stack<CommandBase> SubCommands { get; set; }
 
     /// <summary>
-    ///     Allows you to set another command as the child of this one.
+    ///     If the command triggers another command, register here to have a proper command tree.
+    ///     This allows proper Undo/Redo propagation
     /// </summary>
-    /// <param name="command"></param>
+    /// <param name="command"> The command to add to the subcommands </param>
     void AddToSubCommands(CommandBase command);
 }
 
+/// <summary>
+///     The base interface for a command
+/// </summary>
 public interface ICommand
 {
 }
