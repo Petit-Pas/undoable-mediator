@@ -85,7 +85,7 @@ public class CommandResponse : CommandResponse<NoResponse>
     ///     Creates a CommandResponse with a status of Canceled and a content of NoAnswer
     /// </summary>
     /// <returns> The build QueryResponse </returns>
-    public static ICommandResponse Canceled()
+    public static ICommandResponse<NoResponse> Canceled()
     {
         return new CommandResponse(RequestStatus.Canceled);
     }
@@ -103,7 +103,7 @@ public class CommandResponse : CommandResponse<NoResponse>
     ///     Creates a CommandResponse with a status of Failed and a content of NoAnswer
     /// </summary>
     /// <returns> The build QueryResponse </returns>
-    public static ICommandResponse Failed()
+    public static ICommandResponse<NoResponse> Failed()
     {
         return new CommandResponse(RequestStatus.Failed);
     }
