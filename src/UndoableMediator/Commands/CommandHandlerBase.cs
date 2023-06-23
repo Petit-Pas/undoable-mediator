@@ -80,30 +80,30 @@ public abstract class CommandHandlerBase<TCommand, TResponse> : ICommandHandler<
     }
 
     // <inheritdoc />
-    public void Redo(ICommand command)
+    public async Task Redo(ICommand command)
     {
         if (command is not TCommand castedCommand)
         {
             throw new InvalidOperationException($"Cannot undo command of type {command.GetType().FullName} because it is not of type {typeof(TCommand).FullName}");
         }
-        Redo(castedCommand);
+        await Redo(castedCommand);
     }
 
     // <inheritdoc />
-    public virtual void Redo(TCommand command)
+    public virtual async Task Redo(TCommand command)
     {
-        RedoSubCommands(command);
+        await RedoSubCommands(command);
     }
 
     /// <summary>
     ///     Will simply propagate the redo call to the porential subCommands registered.
     /// </summary>
     /// <param name="command"></param>
-    private void RedoSubCommands(TCommand command)
+    private async Task RedoSubCommands(TCommand command)
     {
         foreach (var subCommand in command.SubCommands)
         {
-            _mediator.Redo(subCommand);
+            await _mediator.Redo(subCommand);
         }
     }
 }

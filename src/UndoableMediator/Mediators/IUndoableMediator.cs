@@ -46,7 +46,7 @@ public interface IUndoableMediator
     ///     This method should normally not be called by client code, it will be used internally by RedoLastUndoneCommand
     /// </summary>
     /// <param name="command"></param>
-    void Redo(ICommand command);
+    Task Redo(ICommand command);
 
     /// <summary>
     ///     If a command was previously undone with UndoLastCommand, and none has been added added to the history since
@@ -56,7 +56,7 @@ public interface IUndoableMediator
     ///     It is very important that the handler knows if it needs to requery the data, or store the result of the query in the command for later usage.
     /// </summary>
     /// <returns> true if there was a command to redo, false otherwise </returns>
-    bool RedoLastUndoneCommand();
+    Task<bool> RedoLastUndoneCommand();
 
     /// <summary>
     ///     Property to access the inner length of the history.

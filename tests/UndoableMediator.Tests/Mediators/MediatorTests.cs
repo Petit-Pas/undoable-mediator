@@ -62,9 +62,9 @@ public class MediatorTests
     }
 
     // Redo
-    private Action RedoingCommand<TResponse>(ICommand<TResponse> command)
+    private Func<Task> RedoingCommand<TResponse>(ICommand<TResponse> command)
     {
-        return () => _mediator.Redo(command);
+        return async () => await _mediator.Redo(command);
     }
 
     [TestFixture]
@@ -122,7 +122,7 @@ public class MediatorTests
             // Act & Assert
             RedoingCommand(new ChangeAgeCommand(12))
                 .Should()
-                .Throw<NotImplementedException>();
+                .ThrowAsync<NotImplementedException>();
         }
     }
 
@@ -465,13 +465,13 @@ public class MediatorTests
         }
 
         [Test]
-        public void Should_Return_False_When_History_Is_Empty()
+        public async Task Should_Return_False_When_History_Is_Empty()
         {
             // Arrange
             _mediator._redoHistory.Clear();
 
             // Act
-            var result = _mediator.RedoLastUndoneCommand();
+            var result = await _mediator.RedoLastUndoneCommand();
 
             // Assert
             result.Should().BeFalse();
@@ -488,10 +488,10 @@ public class MediatorTests
         }
 
         [Test]
-        public void Should_Move_Command_From_Redo_History_To_History_When_Undoing()
+        public async Task Should_Move_Command_From_Redo_History_To_History_When_Undoing()
         {
             // Act
-            _mediator.RedoLastUndoneCommand();
+            await _mediator.RedoLastUndoneCommand();
 
             // Assert
             _mediator._commandHistory.Should().Contain(_lastUndoneCommand);

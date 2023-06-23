@@ -23,8 +23,8 @@ public class ChangeAgeCommandHandler : CommandHandlerBase<ChangeAgeCommand>
         AffectedObject.Age = command.OldAge;
     }
 
-    public override void Redo(ChangeAgeCommand command)
+    public override async Task Redo(ChangeAgeCommand command)
     {
-        Execute(command);
+        await Execute(command);
     }
 }

@@ -25,8 +25,8 @@ public class ChangeNameCommandHandler : CommandHandlerBase<ChangeNameCommand>
         }
     }
 
-    public override void Redo(ChangeNameCommand command)
+    public override async Task Redo(ChangeNameCommand command)
     {
-        Execute(command);
+        await Execute(command);
     }
 }

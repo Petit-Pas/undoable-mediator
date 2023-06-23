@@ -129,7 +129,7 @@ public class Mediator : IUndoableMediator
     }
 
     // <inheritdoc />
-    public void Redo(ICommand command)
+    public async Task Redo(ICommand command)
     {
         ICommandHandler? handler = null;
 
@@ -154,11 +154,11 @@ public class Mediator : IUndoableMediator
             throw new NotImplementedException($"Could not find a handler for command of type {command.GetType().FullName}");
         }
 
-        handler.Redo(command);
+        await handler.Redo(command);
     }
 
     // <inheritdoc />
-    public bool RedoLastUndoneCommand()
+    public async Task<bool> RedoLastUndoneCommand()
     {
         if (_redoHistory.Count == 0) 
         {
@@ -167,7 +167,7 @@ public class Mediator : IUndoableMediator
 
         var lastCommandUndone = _redoHistory.Last();
 
-        Redo(lastCommandUndone);
+        await Redo(lastCommandUndone);
 
         MoveLastCommandFromRedoHistoryToHistory();
         

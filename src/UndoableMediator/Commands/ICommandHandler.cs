@@ -27,7 +27,7 @@ public interface ICommandHandler<TCommand, TResponse> : ICommandHandler
     ///     Can be overridden to add some more comportments, should be the case if the command actually modifies the state of anything.
     /// </summary>
     /// <param name="command"> The command to redo </param>
-    void Redo(TCommand command);
+    Task Redo(TCommand command);
 }
 
 /// <summary>
@@ -55,5 +55,5 @@ public interface ICommandHandler
     /// </summary>
     /// <param name="command"> The command to redo </param>
     /// <exception cref="InvalidOperationException"> Should never be thrown, unless being called wrongly by something else than the mediator </exception>
-    void Redo(ICommand command);
+    Task Redo(ICommand command);
 }
