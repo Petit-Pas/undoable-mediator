@@ -9,14 +9,14 @@ public abstract class QueryHandlerBase<TQuery, TResponse> : IQueryHandler<TQuery
     where TQuery : class, IQuery<TResponse>
 {
     // <inheritdoc />
-    public abstract IQueryResponse<TResponse> Execute(TQuery query);
+    public abstract Task<IQueryResponse<TResponse>> Execute(TQuery query);
 
     // <inheritdoc />
-    public IQueryResponse Execute(IQuery query)
+    public async Task<IQueryResponse> Execute(IQuery query)
     {
         if (query is TQuery castedCommand)
         {
-            return Execute(castedCommand);
+            return await Execute(castedCommand);
         }
         throw new InvalidOperationException($"Cannot execute query of type {query.GetType().FullName} because it is not of type {typeof(TQuery).FullName}");
     }

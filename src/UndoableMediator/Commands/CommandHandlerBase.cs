@@ -37,17 +37,17 @@ public abstract class CommandHandlerBase<TCommand, TResponse> : ICommandHandler<
     }
 
     // <inheritdoc />
-    public ICommandResponse Execute(ICommand command)
+    public async Task<ICommandResponse> Execute(ICommand command)
     {
         if (command is not TCommand castedCommand)
         {
             throw new InvalidOperationException($"Cannot execute command of type {command.GetType().FullName} because it is not of type {typeof(TCommand).FullName}");
         }
-        return Execute(castedCommand);
+        return await Execute(castedCommand);
     }
 
     // <inheritdoc />
-    public abstract ICommandResponse<TResponse> Execute(TCommand command);
+    public abstract Task<ICommandResponse<TResponse>> Execute(TCommand command);
 
     // <inheritdoc />
     public void Undo(ICommand command)

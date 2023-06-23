@@ -20,7 +20,7 @@ public class QueryResponse<TResponse> : IQueryResponse<TResponse>
     /// <typeparam name="TResponse"> Type expected as answer from the query </typeparam>
     /// <param name="response"> Answer of the query </param>
     /// <returns> The build QueryResponse </returns>
-    public static QueryResponse<TResponse> Canceled(TResponse response)
+    public static IQueryResponse<TResponse> Canceled(TResponse response)
     {
 		return new QueryResponse<TResponse>(response, RequestStatus.Canceled);
     }
@@ -31,7 +31,7 @@ public class QueryResponse<TResponse> : IQueryResponse<TResponse>
     /// <typeparam name="TResponse"> Type expected as answer from the query </typeparam>
     /// <param name="response"> Answer of the query </param>
     /// <returns> The build QueryResponse </returns>
-    public static QueryResponse<TResponse> Success(TResponse response)
+    public static IQueryResponse<TResponse> Success(TResponse response)
     {
         return new QueryResponse<TResponse>(response, RequestStatus.Success);
     }
@@ -42,7 +42,7 @@ public class QueryResponse<TResponse> : IQueryResponse<TResponse>
     /// <typeparam name="TResponse"> Type expected as answer from the query </typeparam>
     /// <param name="response"> Answer of the query </param>
     /// <returns> The build QueryResponse </returns>
-    public static QueryResponse<TResponse> Failed(TResponse response)
+    public static IQueryResponse<TResponse> Failed(TResponse response)
     {
         return new QueryResponse<TResponse>(response, RequestStatus.Failed);
     }

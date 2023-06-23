@@ -61,11 +61,11 @@ public class Mediator : IUndoableMediator
     }
 
     // <inheritdoc />
-    public ICommandResponse<TResponse> Execute<TResponse>(ICommand<TResponse> command, Func<RequestStatus, bool>? shouldAddCommandToHistory = null)
+    public async Task<ICommandResponse<TResponse>> Execute<TResponse>(ICommand<TResponse> command, Func<RequestStatus, bool>? shouldAddCommandToHistory = null)
     {
         var handler = GetCommandHandlerFor(command);
 
-        var response = handler.Execute(command);
+        var response = await handler.Execute(command);
 
         if (shouldAddCommandToHistory != null && shouldAddCommandToHistory(response.Status))
         {
@@ -76,10 +76,10 @@ public class Mediator : IUndoableMediator
 
 
     // <inheritdoc />
-    public IQueryResponse<TResponse> Execute<TResponse>(IQuery<TResponse> query)
+    public async Task<IQueryResponse<TResponse>> Execute<TResponse>(IQuery<TResponse> query)
     {
         var handler = GetQueryHandlerFor(query);
-        return (IQueryResponse<TResponse>)handler.Execute(query);
+        return (await handler.Execute(query)) as IQueryResponse<TResponse>;
     }
 
     // <inheritdoc />

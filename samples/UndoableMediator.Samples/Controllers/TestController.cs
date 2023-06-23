@@ -24,10 +24,10 @@ namespace UndoableMediator.Samples.Controllers
 
         [HttpGet]
         [Route("getRandomInt")]
-        public ActionResult<int> GetInt()
+        public async Task<ActionResult<int>> GetInt()
         {
             var command = new RandomIntQuery();
-            var result = _mediator.Execute(command);
+            var result = await _mediator.Execute(command);
 
             return Ok(result.Response);
         }
@@ -45,11 +45,11 @@ namespace UndoableMediator.Samples.Controllers
 
         [HttpGet]
         [Route("setRandomAge")]
-        public ActionResult<int> Get()
+        public async Task<ActionResult<int>> Get()
         {
             var command = new SetRandomAgeCommand();
 
-            var result = _mediator.Execute(command, IUndoableMediator.AddAlways);
+            var result = await _mediator.Execute(command, IUndoableMediator.AddAlways);
             _mediator.UndoLastCommand();
 
             _mediator.RedoLastUndoneCommand();

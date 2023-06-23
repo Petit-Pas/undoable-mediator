@@ -9,12 +9,12 @@ public class ChangeNameCommandHandler : CommandHandlerBase<ChangeNameCommand>
     {
     }
 
-    public override CommandResponse Execute(ChangeNameCommand command)
+    public override Task<ICommandResponse<NoResponse>> Execute(ChangeNameCommand command)
     {
         command.OldName = AffectedObject.Name;
         AffectedObject.Name = command.NewName;
 
-        return CommandResponse.Success();
+        return Task.FromResult(CommandResponse.Success());
     }
     
     public override void Undo(ChangeNameCommand command)

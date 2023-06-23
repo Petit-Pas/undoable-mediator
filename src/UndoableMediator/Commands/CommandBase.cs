@@ -1,4 +1,6 @@
-﻿namespace UndoableMediator.Commands;
+﻿using UndoableMediator.Mediators;
+
+namespace UndoableMediator.Commands;
 
 /// <summary>
 ///     The base class to use for a command that returns nothing.
@@ -17,6 +19,12 @@ public abstract class CommandBase<TResponse> : ICommand<TResponse>
     public void AddToSubCommands(CommandBase command)
     {
         SubCommands.Push(command);
+    }
+
+    public void ExecuteSubCommand(IUndoableMediator mediator, CommandBase command)
+    {
+        mediator.Execute(command);
+        AddToSubCommands(command);
     }
 
     // <inheritdoc />

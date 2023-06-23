@@ -9,15 +9,15 @@ public class ChangeAgeAndNameCommandHandler : CommandHandlerBase<ChangeAgeAndNam
     {
     }
 
-    public override CommandResponse Execute(ChangeAgeAndNameCommand command)
+    public override async Task<ICommandResponse<NoResponse>> Execute(ChangeAgeAndNameCommand command)
     {
         var changeAgeCmd = new ChangeAgeCommand(command.Age);
         var changeNameCmd = new ChangeNameCommand(command.Name);
 
-        _mediator.Execute(changeAgeCmd);
+        await _mediator.Execute(changeAgeCmd);
         command.AddToSubCommands(changeAgeCmd);
 
-        _mediator.Execute(changeNameCmd);
+        await _mediator.Execute(changeNameCmd);
         command.AddToSubCommands(changeNameCmd);
 
         return CommandResponse.Success();

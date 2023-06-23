@@ -1,4 +1,5 @@
-﻿using UndoableMediator.Requests;
+﻿using UndoableMediator.Queries;
+using UndoableMediator.Requests;
 
 namespace UndoableMediator.Commands;
 
@@ -14,6 +15,14 @@ public class CommandResponse<TResponse> : ICommandResponse<TResponse>
         Status = status;
     }
 
+    public CommandResponse(ICommandResponse commandResponse) : this(default, commandResponse.Status)
+    {
+    }
+
+    public CommandResponse(IQueryResponse commandResponse) : this(default, commandResponse.Status)
+    {
+    }
+
     // <inheritdoc />
     public TResponse? Response { get; }
 
@@ -27,7 +36,15 @@ public class CommandResponse<TResponse> : ICommandResponse<TResponse>
 /// </summary>
 public class CommandResponse : CommandResponse<NoResponse>
 {
-    private CommandResponse(RequestStatus status) : base(NoResponse.Value, status)
+    internal CommandResponse(RequestStatus status) : base(NoResponse.Value, status)
+    {
+    }
+
+    public CommandResponse(ICommandResponse commandResponse) : base(NoResponse.Value, commandResponse.Status)
+    {
+    }
+
+    public CommandResponse(IQueryResponse commandResponse) : base(NoResponse.Value, commandResponse.Status)
     {
     }
 
@@ -37,7 +54,7 @@ public class CommandResponse : CommandResponse<NoResponse>
     /// <typeparam name="TContent"> Type expected as answer from the command </typeparam>
     /// <param name="response"> Answer of the command, 'default' by default </param>
     /// <returns> The build QueryResponse </returns>
-    public static CommandResponse<TContent> Canceled<TContent>(TContent? response = default)
+    public static ICommandResponse<TContent> Canceled<TContent>(TContent? response = default)
     {
         return new CommandResponse<TContent>(response, RequestStatus.Canceled);
     }
@@ -48,7 +65,7 @@ public class CommandResponse : CommandResponse<NoResponse>
     /// <typeparam name="TContent"> Type expected as answer from the command </typeparam>
     /// <param name="response"> Answer of the command, 'default' by default </param>
     /// <returns> The build QueryResponse </returns>
-    public static CommandResponse<TContent> Success<TContent>(TContent? response = default)
+    public static ICommandResponse<TContent> Success<TContent>(TContent? response = default)
     {
         return new CommandResponse<TContent>(response, RequestStatus.Success);
     }
@@ -59,7 +76,7 @@ public class CommandResponse : CommandResponse<NoResponse>
     /// <typeparam name="TContent"> Type expected as answer from the command </typeparam>
     /// <param name="response"> Answer of the command, 'default' by default </param>
     /// <returns> The build QueryResponse </returns>
-    public static CommandResponse<TContent> Failed<TContent>(TContent? response = default)
+    public static ICommandResponse<TContent> Failed<TContent>(TContent? response = default)
     {
         return new CommandResponse<TContent>(response, RequestStatus.Failed);
     }
@@ -68,7 +85,7 @@ public class CommandResponse : CommandResponse<NoResponse>
     ///     Creates a CommandResponse with a status of Canceled and a content of NoAnswer
     /// </summary>
     /// <returns> The build QueryResponse </returns>
-    public static CommandResponse Canceled()
+    public static ICommandResponse Canceled()
     {
         return new CommandResponse(RequestStatus.Canceled);
     }
@@ -77,7 +94,7 @@ public class CommandResponse : CommandResponse<NoResponse>
     ///     Creates a CommandResponse with a status of Success and a content of NoAnswer
     /// </summary>
     /// <returns> The build QueryResponse </returns>
-    public static CommandResponse Success()
+    public static ICommandResponse<NoResponse> Success()
     {
         return new CommandResponse(RequestStatus.Success);
     }
@@ -86,7 +103,7 @@ public class CommandResponse : CommandResponse<NoResponse>
     ///     Creates a CommandResponse with a status of Failed and a content of NoAnswer
     /// </summary>
     /// <returns> The build QueryResponse </returns>
-    public static CommandResponse Failed()
+    public static ICommandResponse Failed()
     {
         return new CommandResponse(RequestStatus.Failed);
     }

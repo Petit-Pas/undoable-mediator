@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Metadata.Ecma335;
+using System.Threading.Tasks;
 using FakeItEasy;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
@@ -44,14 +45,14 @@ public class MediatorTests
 
 
     // Execute
-    private Action ExecutingCommand<TResponse>(ICommand<TResponse> command)
+    private Func<Task> ExecutingCommand<TResponse>(ICommand<TResponse> command)
     {
-        return () => _mediator.Execute(command);
+        return async () => await _mediator.Execute(command);
     }
 
-    private Action ExecutingQuery<TResponse>(IQuery<TResponse> command)
+    private Func<Task> ExecutingQuery<TResponse>(IQuery<TResponse> command)
     {
-        return () => _mediator.Execute(command);
+        return async () => await _mediator.Execute(command);
     }
 
     // Undo
@@ -80,7 +81,7 @@ public class MediatorTests
             // Act & Assert
             ExecutingCommand(new ChangeAgeCommand(12))
                 .Should()
-                .Throw<NotImplementedException>();
+                .ThrowAsync<NotImplementedException>();
         }
 
         [Test]
@@ -93,7 +94,7 @@ public class MediatorTests
             // Act & Assert
             ExecutingQuery(new CancelableQuery(true))
                 .Should()
-                .Throw<NotImplementedException>();
+                .ThrowAsync<NotImplementedException>();
         }
 
         // Undo
@@ -162,13 +163,13 @@ public class MediatorTests
         [Test]
         [TestCase(RequestStatus.Success, false)]
         [TestCase(RequestStatus.Canceled, true)]
-        public void Should_Return_CommandStatus(RequestStatus expectedRequestStatus, bool commandShouldBeCanceled)
+        public async Task Should_Return_CommandStatus(RequestStatus expectedRequestStatus, bool commandShouldBeCanceled)
         {
             // Arrange
             _requestStatus = expectedRequestStatus;
 
             // Act
-            var result = _mediator.Execute(_command);
+            var result = await _mediator.Execute(_command);
 
             // Assert
             result.Status.Should().Be(expectedRequestStatus);
@@ -177,13 +178,13 @@ public class MediatorTests
         [Test]
         [TestCase(false)]
         [TestCase(true)]
-        public void Should_Return_Command_Response(bool commandShouldBeCanceled)
+        public async Task Should_Return_Command_Response(bool commandShouldBeCanceled)
         {
             // Arrange
             _requestAnswer = commandShouldBeCanceled;
 
             // Act
-            var result = _mediator.Execute(_command);
+            var result = await _mediator.Execute(_command);
 
             // Assert
             result.Response.Should().Be(commandShouldBeCanceled);
@@ -193,13 +194,13 @@ public class MediatorTests
         [TestCase(null, 0)]
         [TestCase(false, 0)]
         [TestCase(true, 1)]
-        public void Should_Add_To_History_When_Requested_Only(bool? shouldAdd, int addedToHistory)
+        public async Task Should_Add_To_History_When_Requested_Only(bool? shouldAdd, int addedToHistory)
         {
             // Arrange
             var previousHistorySize = _mediator.HistoryLength;
 
             // Act
-            _mediator.Execute(_command, shouldAdd != null ? (_) => shouldAdd.Value : null);
+            await _mediator.Execute(_command, shouldAdd != null ? (_) => shouldAdd.Value : null);
 
             // Assert
             _mediator.HistoryLength.Should().Be(previousHistorySize + addedToHistory);
@@ -223,7 +224,7 @@ public class MediatorTests
         }
 
         [Test]
-        public void Should_Roll_Out_A_Command_From_History_When_Max_Limit_Has_Been_Reached()
+        public async Task Should_Roll_Out_A_Command_From_History_When_Max_Limit_Has_Been_Reached()
         {
             while (_mediator.HistoryLength != _mediator._commandHistoryMaxSize)
             {
@@ -233,7 +234,7 @@ public class MediatorTests
             var nextToLastCommand = _mediator._commandHistory[1];
 
             // Act
-            _mediator.Execute(new CancelableCommand(false), _ => true);
+            await _mediator.Execute(new CancelableCommand(false), _ => true);
 
             // Assert
             _mediator._commandHistory.First().Should().Be(nextToLastCommand);
@@ -241,7 +242,7 @@ public class MediatorTests
         }
 
         [Test]
-        public void Should_Erase_All_Possible_Redo_History()
+        public async Task Should_Erase_All_Possible_Redo_History()
         {
             // Arrange
             _mediator._redoHistory.Add(new CancelableCommand(true));
@@ -249,7 +250,7 @@ public class MediatorTests
             _mediator._redoHistory.Add(new CancelableCommand(true));
 
             // Act
-            _mediator.Execute(_command, _ => true);
+            await _mediator.Execute(_command, _ => true);
 
             // Assert
             _mediator.RedoHistoryLength.Should().Be(0);
@@ -279,11 +280,11 @@ public class MediatorTests
         }
 
         [Test]
-        public void Should_Call_Execute_Method_Of_Handler()
+        public async Task Should_Call_Execute_Method_Of_Handler()
         {
             // Arrange
             // Act
-            _mediator.Execute(_query);
+            await _mediator.Execute(_query);
 
             // Assert
             A.CallTo(() => _queryHandler.Execute(A<IQuery<bool>>._))
@@ -293,13 +294,13 @@ public class MediatorTests
         [Test]
         [TestCase(RequestStatus.Success, false)]
         [TestCase(RequestStatus.Canceled, true)]
-        public void Should_Return_CommandStatus(RequestStatus expectedRequestStatus, bool commandShouldBeCanceled)
+        public async Task Should_Return_CommandStatus(RequestStatus expectedRequestStatus, bool commandShouldBeCanceled)
         {
             // Arrange
             _requestStatus = expectedRequestStatus;
 
             // Act
-            var result = _mediator.Execute(_query);
+            var result = await _mediator.Execute(_query);
 
             // Assert
             result.Status.Should().Be(expectedRequestStatus);
@@ -308,13 +309,13 @@ public class MediatorTests
         [Test]
         [TestCase(false)]
         [TestCase(true)]
-        public void Should_Return_Command_Response(bool queryShouldBeCanceled)
+        public async Task Should_Return_Command_Response(bool queryShouldBeCanceled)
         {
             // Arrange
             _requestAnswer = queryShouldBeCanceled;
 
             // Act
-            var result = _mediator.Execute(_query);
+            var result = await _mediator.Execute(_query);
 
             // Assert
             result.Response.Should().Be(queryShouldBeCanceled);
@@ -356,7 +357,7 @@ public class MediatorTests
         CancelableCommand _lastAddedCommand = null!;
 
         [SetUp]
-        public void Setup()
+        public async Task Setup()
         {
             var commandHandler = A.Fake<ICommandHandler<CancelableCommand, bool>>();
 
@@ -366,9 +367,9 @@ public class MediatorTests
                 .ReturnsLazily(() => new CommandResponse<bool>(true, RequestStatus.Success));
 
 
-            _mediator.Execute(new CancelableCommand(false), _ => true);
-            _mediator.Execute(new CancelableCommand(false), _ => true);
-            _mediator.Execute(new CancelableCommand(false), _ => true);
+            await _mediator.Execute(new CancelableCommand(false), _ => true);
+            await _mediator.Execute(new CancelableCommand(false), _ => true);
+            await _mediator.Execute(new CancelableCommand(false), _ => true);
 
             _lastAddedCommand = (CancelableCommand)_mediator._commandHistory.Last();
         }

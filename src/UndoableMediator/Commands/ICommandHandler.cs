@@ -13,7 +13,7 @@ public interface ICommandHandler<TCommand, TResponse> : ICommandHandler
     /// </summary>
     /// <param name="command"> The command to execute </param>
     /// <returns> The command response </returns>
-    ICommandResponse<TResponse> Execute(TCommand command);
+    Task<ICommandResponse<TResponse>> Execute(TCommand command);
 
     /// <summary>
     ///     This is the actual Undo method that does the job, by default it only propagates to subcommands.
@@ -41,7 +41,7 @@ public interface ICommandHandler
     /// <param name="command"> The command to execute </param>
     /// <returns> The response of the command, can be casted into ICommandResponse<TResponse> </returns>
     /// <exception cref="InvalidOperationException"> Should never be thrown, unless being called wrongly by something else than the mediator </exception>
-    ICommandResponse Execute(ICommand command);
+    Task<ICommandResponse> Execute(ICommand command);
 
     /// <summary>
     ///     Generic method, will be called first, then specialize into the other "Undo()"

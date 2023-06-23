@@ -13,7 +13,7 @@ public interface IQueryHandler<TQuery, TResponse> : IQueryHandler
     /// </summary>
     /// <param name="query"> The query to execute </param>
     /// <returns> The query response </returns>
-    IQueryResponse<TResponse> Execute(TQuery query);
+    Task<IQueryResponse<TResponse>> Execute(TQuery query);
 }
 
 /// <summary>
@@ -27,5 +27,5 @@ public interface IQueryHandler
     /// <param name="query"> The query to execute </param>
     /// <returns> The response of the query, can be casted into IQueryResponse<TResponse> </returns>
     /// <exception cref="InvalidOperationException"> Should never be thrown, unless being called wrongly by something else than the mediator </exception>
-    IQueryResponse Execute(IQuery query);
+    Task<IQueryResponse> Execute(IQuery query);
 }

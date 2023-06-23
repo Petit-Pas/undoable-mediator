@@ -18,7 +18,7 @@ public interface IUndoableMediator
     /// <param name="command"> The command to execute </param>
     /// <param name="shouldAddCommandToHistory"> A delegate to tell if the command should be added to the history or not, depending on the RequestStatus </param>
     /// <returns> The CommandResponse expected by the command </returns>
-    ICommandResponse<TResponse> Execute<TResponse>(ICommand<TResponse> command, Func<RequestStatus, bool>? shouldAddCommandToHistory = null);
+    Task<ICommandResponse<TResponse>> Execute<TResponse>(ICommand<TResponse> command, Func<RequestStatus, bool>? shouldAddCommandToHistory = null);
 
     /// <summary>
     ///     The method to execute a query
@@ -26,7 +26,7 @@ public interface IUndoableMediator
     /// <typeparam name="TResponse"> The type of the response expected by this query </typeparam>
     /// <param name="query"> The query to execute </param>
     /// <returns> The QueryResponse expected by the query </returns>
-    IQueryResponse<TResponse> Execute<TResponse>(IQuery<TResponse> query);
+    Task<IQueryResponse<TResponse>> Execute<TResponse>(IQuery<TResponse> query);
 
     /// <summary>
     ///     A method to Undo a command. 

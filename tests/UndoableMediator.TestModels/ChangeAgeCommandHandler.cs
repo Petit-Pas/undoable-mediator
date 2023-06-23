@@ -9,12 +9,12 @@ public class ChangeAgeCommandHandler : CommandHandlerBase<ChangeAgeCommand>
     {
     }
 
-    public override CommandResponse Execute(ChangeAgeCommand command)
+    public override Task<ICommandResponse<NoResponse>> Execute(ChangeAgeCommand command)
     {
         command.OldAge = AffectedObject.Age;
         AffectedObject.Age = command.NewAge;
 
-        return CommandResponse.Success();
+        return Task.FromResult(CommandResponse.Success());
     }
 
     public override void Undo(ChangeAgeCommand command)
