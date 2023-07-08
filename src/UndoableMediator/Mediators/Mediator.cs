@@ -12,7 +12,7 @@ public class Mediator : IUndoableMediator
     private readonly ILogger _logger;
     private readonly IServiceProvider _serviceProvider;
 
-    internal Mediator(ILogger<IUndoableMediator> logger, IServiceProvider serviceProvider, UndoableMediatorOptions options)
+    public Mediator(ILogger<IUndoableMediator> logger, IServiceProvider serviceProvider, UndoableMediatorOptions options)
     {
         _logger = logger;
         _serviceProvider = serviceProvider;
