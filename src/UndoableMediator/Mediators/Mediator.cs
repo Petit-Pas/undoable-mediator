@@ -200,11 +200,7 @@ public class Mediator : IUndoableMediator
 
     public int RedoHistoryLength => _redoHistory.Count;
 
-    int IUndoableMediator.HistoryLength => throw new NotImplementedException();
-
-    int IUndoableMediator.RedoHistoryLength => throw new NotImplementedException();
-
-    //  These methods could be moved in another class.
+    // TODO These methods could be moved in another class.
     private MethodInfo GetClosedGenericMethod(MethodInfo baseMethod, Type type1)
     {
         return baseMethod.MakeGenericMethod(type1);
