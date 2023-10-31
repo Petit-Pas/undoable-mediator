@@ -36,7 +36,7 @@ public class CommandResponse<TResponse> : ICommandResponse<TResponse>
 /// </summary>
 public class CommandResponse : CommandResponse<NoResponse>
 {
-    internal CommandResponse(RequestStatus status) : base(NoResponse.Value, status)
+    public CommandResponse(RequestStatus status) : base(NoResponse.Value, status)
     {
     }
 
