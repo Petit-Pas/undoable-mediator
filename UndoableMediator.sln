@@ -23,7 +23,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "samples", "samples", "{9F96
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UndoableMediator.Samples", "samples\UndoableMediator.Samples\UndoableMediator.Samples.csproj", "{8B367CD0-DC7D-4414-9BCE-34CD5CBEECBB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UndoableMediator.MissingHandlerDll", "UndoableMediator.MissingHandlerDll\UndoableMediator.MissingHandlerDll.csproj", "{56437F50-43D7-400F-AB22-4BE8D4B96EA2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UndoableMediator.MissingHandlerDll", "UndoableMediator.MissingHandlerDll\UndoableMediator.MissingHandlerDll.csproj", "{56437F50-43D7-400F-AB22-4BE8D4B96EA2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
