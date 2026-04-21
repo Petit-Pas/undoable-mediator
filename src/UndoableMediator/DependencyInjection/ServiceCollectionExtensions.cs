@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using System.Data;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Reflection;
 using UndoableMediator.Commands;
 using UndoableMediator.Mediators;
@@ -9,7 +10,7 @@ namespace UndoableMediator.DependencyInjection;
 
 public static class ServiceCollectionExtensions
 {
-    public static void ConfigureMediator(this IServiceCollection serviceCollection, Action<UndoableMediatorOptions>? optionSetter = null)
+    public static void ConfigureMediator(this IServiceCollection serviceCollection, Action<UndoableMediatorOptions>? optionSetter = null, ILoggerFactory? loggerFactory = null)
     {
         var options = new UndoableMediatorOptions();
 
@@ -27,28 +28,28 @@ public static class ServiceCollectionExtensions
             throw new InvalidOperationException($"Cannot configure a Mediator with a RedoHistoryMaxSize of {options.RedoHistoryMaxSize}");
         }
 
+        var logger = loggerFactory?.CreateLogger(typeof(ServiceCollectionExtensions)) ?? NullLogger.Instance;
 
         serviceCollection.AddSingleton(options);
         serviceCollection.AddSingleton<IUndoableMediator, Mediator>();
 
-
-        ScanAssemblies(options.AssembliesToScan, options.ShouldScanAutomatically, serviceCollection);
+        ScanAssemblies(options.AssembliesToScan, options.ShouldScanAutomatically, serviceCollection, logger);
     }
 
-    internal static void ScanAssemblies(Assembly[] AdditionalAssemblies, bool ShouldScanAutomatically, IServiceCollection serviceCollection)
+    internal static void ScanAssemblies(Assembly[] additionalAssemblies, bool shouldScanAutomatically, IServiceCollection serviceCollection, ILogger logger)
     {
-        var assembliesToScan = ShouldScanAutomatically
+        var assembliesToScan = shouldScanAutomatically
             ? AppDomain.CurrentDomain.GetAssemblies()
             : Array.Empty<Assembly>();
 
-        if (AdditionalAssemblies != null && AdditionalAssemblies.Length != 0)
+        if (additionalAssemblies != null && additionalAssemblies.Length != 0)
         {
-            assembliesToScan = assembliesToScan.Union(AdditionalAssemblies).ToArray();
+            assembliesToScan = assembliesToScan.Union(additionalAssemblies).ToArray();
         }
 
         foreach (var assembly in assembliesToScan)
         {
-            Console.WriteLine($"Mediator is scanning '{assembly.FullName}' assembly looking for handlers to register.");
+            logger.LogDebug("Mediator is scanning '{AssemblyName}' assembly looking for handlers to register.", assembly.FullName);
             try
             {
                 foreach (var implementationType in assembly.GetTypes().Where(t => !t.GetTypeInfo().IsAbstract))
@@ -60,14 +61,14 @@ public static class ServiceCollectionExtensions
                             genericDefinition == typeof(IQueryHandler<,>))
                         {
                             serviceCollection.AddTransient(interfaceType, implementationType);
-                            Console.WriteLine($"Mediator found handler '{implementationType}' to register.");
+                            logger.LogDebug("Mediator found handler '{HandlerType}' to register.", implementationType);
                         }
                     }
                 }
             }
             catch (ReflectionTypeLoadException)
             {
-                Console.WriteLine($"UndoableMediator could not load types from {assembly.FullName}");
+                logger.LogWarning("UndoableMediator could not load types from {AssemblyName}", assembly.FullName);
             }
         }
     }

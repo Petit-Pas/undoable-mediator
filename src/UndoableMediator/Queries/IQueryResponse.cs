@@ -5,13 +5,13 @@ namespace UndoableMediator.Queries;
 /// <summary>
 ///     Base generic interface for query responses, holds the response as well as the status
 /// </summary>
-/// <typeparam name="T"></typeparam>
-public interface IQueryResponse<T> : IQueryResponse
+/// <typeparam name="TResponse"> The type of the response </typeparam>
+public interface IQueryResponse<TResponse> : IQueryResponse
 {
     /// <summary>
     ///     The potential response of the query
     /// </summary>
-    T? Response { get; }
+    TResponse? Response { get; }
 }
 
 /// <summary>

@@ -1,4 +1,5 @@
 ﻿using UndoableMediator.Mediators;
+using UndoableMediator.Requests;
 
 namespace UndoableMediator.Commands;
 
@@ -23,7 +24,7 @@ public abstract class CommandHandlerBase<TCommand, TResponse> : ICommandHandler<
     where TCommand : class, ICommand<TResponse>
 {
     /// <summary>
-    ///     The mediator instance, can be reused by any command to execute subcommands
+    ///     The mediator instance, can be reused by any command to execute sub-commands
     /// </summary>
     protected readonly IUndoableMediator _mediator;
 
@@ -36,75 +37,125 @@ public abstract class CommandHandlerBase<TCommand, TResponse> : ICommandHandler<
         _mediator = mediator;
     }
 
-    // <inheritdoc />
-    public async Task<ICommandResponse> Execute(ICommand command)
+    // ──────────────────────────────────────────────
+    //  Execute / Undo / Redo — override these in your handler
+    // ──────────────────────────────────────────────
+
+    /// <inheritdoc />
+    public abstract Task<ICommandResponse<TResponse>> ExecuteAsync(TCommand command);
+
+    /// <summary>
+    ///     Undoes the command. By default, propagates undo to all sub-commands in reverse execution order.
+    ///     <para>
+    ///         Override this to restore state mutated in <see cref="ExecuteAsync(TCommand)"/>.
+    ///         You <b>must</b> call <c>base.UndoAsync(command)</c> (typically before your own logic)
+    ///         to propagate undo to sub-commands, or handle them manually.
+    ///     </para>
+    /// </summary>
+    public virtual async Task UndoAsync(TCommand command)
     {
-        if (command is not TCommand castedCommand)
-        {
-            throw new InvalidOperationException($"Cannot execute command of type {command.GetType().FullName} because it is not of type {typeof(TCommand).FullName}");
-        }
-        return await Execute(castedCommand);
-    }
-
-    // <inheritdoc />
-    public abstract Task<ICommandResponse<TResponse>> Execute(TCommand command);
-
-    // <inheritdoc />
-    public void Undo(ICommand command)
-    {
-        if (command is not TCommand castedCommand)
-        {
-            throw new InvalidOperationException($"Cannot undo command of type {command.GetType().FullName} because it is not of type {typeof(TCommand).FullName}");
-        }
-        Undo(castedCommand);
-    }
-
-
-    // <inheritdoc />
-    public virtual void Undo(TCommand command)
-    {
-        UndoSubCommands(command);
+        await PropagateToSubCommandsAsync(command, SubCommandOperation.Undo);
     }
 
     /// <summary>
-    ///     This method gets called by the Undo() call to the CommandHandlerBase
-    ///     Will simply propagate the Undo call to the potential SubCommands registered
+    ///     Redoes the command. By default, propagates redo to all sub-commands in original execution order.
+    ///     <para>
+    ///         Override this to re-apply state. You <b>must</b> either call <c>base.RedoAsync(command)</c>
+    ///         to propagate redo to sub-commands, or handle them manually.
+    ///         Alternatively, call <c>ClearSubCommands(command)</c> followed by <c>ExecuteAsync(command)</c>
+    ///         to re-execute the command from scratch.
+    ///     </para>
     /// </summary>
-    /// <param name="command"> The command to undo </param>
-    private void UndoSubCommands(TCommand command)
+    public virtual async Task RedoAsync(TCommand command)
     {
-        foreach (var subCommand in command.SubCommands)
-        {
-            _mediator.Undo(subCommand);
-        }
+        await PropagateToSubCommandsAsync(command, SubCommandOperation.Redo);
     }
 
-    // <inheritdoc />
-    public async Task Redo(ICommand command)
-    {
-        if (command is not TCommand castedCommand)
-        {
-            throw new InvalidOperationException($"Cannot undo command of type {command.GetType().FullName} because it is not of type {typeof(TCommand).FullName}");
-        }
-        await Redo(castedCommand);
-    }
-
-    // <inheritdoc />
-    public virtual async Task Redo(TCommand command)
-    {
-        await RedoSubCommands(command);
-    }
+    // ──────────────────────────────────────────────
+    //  Sub-command utilities — available to handler implementations
+    // ──────────────────────────────────────────────
 
     /// <summary>
-    ///     Will simply propagate the redo call to the porential subCommands registered.
+    ///     Clears all sub-commands previously registered on the command.
+    ///     Call this in <see cref="RedoAsync(TCommand)"/> before re-executing the command
+    ///     when stale sub-commands should be discarded and re-created from scratch.
     /// </summary>
-    /// <param name="command"></param>
-    private async Task RedoSubCommands(TCommand command)
+    /// <param name="command"> The command whose sub-command stack should be cleared </param>
+    protected void ClearSubCommands(TCommand command)
     {
-        foreach (var subCommand in command.SubCommands)
+        if (command is not ISubCommandHost host)
         {
-            await _mediator.Redo(subCommand);
+            throw new InvalidOperationException($"Command of type {command.GetType().FullName} does not implement {nameof(ISubCommandHost)}. Only commands deriving from {nameof(CommandBase)} support sub-commands.");
+        }
+        host.ClearSubCommands();
+    }
+
+    // ──────────────────────────────────────────────
+    //  Non-generic dispatch — called by the Mediator,
+    //  casts to TCommand then delegates to the typed overload above
+    // ──────────────────────────────────────────────
+
+    /// <inheritdoc />
+    public async Task<ICommandResponse> ExecuteAsync(ICommand command)
+    {
+        var castedCommand = RequestCastHelper.CastOrThrow<TCommand>(command, "execute");
+        return await ExecuteAsync(castedCommand);
+    }
+
+    /// <inheritdoc />
+    public async Task UndoAsync(ICommand command)
+    {
+        var castedCommand = RequestCastHelper.CastOrThrow<TCommand>(command, "undo");
+        await UndoAsync(castedCommand);
+    }
+
+    /// <inheritdoc />
+    public async Task RedoAsync(ICommand command)
+    {
+        var castedCommand = RequestCastHelper.CastOrThrow<TCommand>(command, "redo");
+        await RedoAsync(castedCommand);
+    }
+
+    // ──────────────────────────────────────────────
+    //  Sub-command propagation
+    // ──────────────────────────────────────────────
+
+    private enum SubCommandOperation { Undo, Redo }
+
+    /// <summary>
+    ///     Propagates the given operation to all sub-commands.
+    ///     <list type="bullet">
+    ///         <item><description>Undo: iterates in reverse execution order (LIFO — last executed first).</description></item>
+    ///         <item><description>Redo: iterates in original execution order (FIFO — first executed first).</description></item>
+    ///     </list>
+    /// </summary>
+    private async Task PropagateToSubCommandsAsync(TCommand command, SubCommandOperation operation)
+    {
+        if (command is not ISubCommandHost host)
+        {
+            return;
+        }
+
+        var dispatcher = _mediator as ISubCommandDispatcher 
+            ?? throw new InvalidOperationException($"The mediator must implement {nameof(ISubCommandDispatcher)} to support sub-command {operation.ToString().ToLowerInvariant()}.");
+
+        // Stack iterates LIFO naturally — correct for undo.
+        // Reversing gives FIFO — correct for redo.
+        var subCommands = operation == SubCommandOperation.Undo
+            ? host.SubCommands
+            : host.SubCommands.Reverse();
+
+        foreach (var subCommand in subCommands)
+        {
+            switch (operation)
+            {
+                case SubCommandOperation.Undo:
+                    await dispatcher.UndoAsync(subCommand);
+                    break;
+                case SubCommandOperation.Redo:
+                    await dispatcher.RedoAsync(subCommand);
+                    break;
+            }
         }
     }
 }
-

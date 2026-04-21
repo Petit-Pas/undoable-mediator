@@ -10,10 +10,10 @@ public class CancelableCommandHandler : CommandHandlerBase<CancelableCommand, bo
     {
     }
 
-    public override async Task<ICommandResponse<bool>> Execute(CancelableCommand command)
+    public override async Task<ICommandResponse<bool>> ExecuteAsync(CancelableCommand command)
     {
         var query = new CancelableQuery(command.ShouldBeCanceled);
-        var result = await _mediator.Execute(query);
+        var result = await _mediator.QueryAsync(query);
 
         if (result == null)
         {

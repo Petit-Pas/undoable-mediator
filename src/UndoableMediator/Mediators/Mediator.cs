@@ -1,5 +1,6 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using System.Collections.Concurrent;
 using System.Reflection;
+using Microsoft.Extensions.Logging;
 using UndoableMediator.Commands;
 using UndoableMediator.DependencyInjection;
 using UndoableMediator.Queries;
@@ -7,217 +8,219 @@ using UndoableMediator.Requests;
 
 namespace UndoableMediator.Mediators;
 
-public class Mediator : IUndoableMediator
+public class Mediator : IUndoableMediator, ISubCommandDispatcher
 {
     private readonly ILogger _logger;
     private readonly IServiceProvider _serviceProvider;
+
+    internal int CommandHistoryMaxSize { get; }
+    internal int CommandRedoHistoryMaxSize { get; }
+
+    internal readonly LinkedList<ICommand> CommandHistory;
+    internal readonly LinkedList<ICommand> RedoHistory;
+
+    public int HistoryLength => CommandHistory.Count;
+    public int RedoHistoryLength => RedoHistory.Count;
 
     public Mediator(ILogger<IUndoableMediator> logger, IServiceProvider serviceProvider, UndoableMediatorOptions options)
     {
         _logger = logger;
         _serviceProvider = serviceProvider;
 
-        _commandHistoryMaxSize = options.CommandHistoryMaxSize;
-        _commandHistoryMaxSize = options.RedoHistoryMaxSize;
+        CommandHistoryMaxSize = options.CommandHistoryMaxSize;
+        CommandRedoHistoryMaxSize = options.RedoHistoryMaxSize;
 
-        _commandHistory = new List<ICommand>(_commandHistoryMaxSize);
-        _redoHistory = new List<ICommand>(_commandRedoHistoryMaxSize);
+        CommandHistory = new LinkedList<ICommand>();
+        RedoHistory = new LinkedList<ICommand>();
     }
 
-    // Config
-    internal int _commandHistoryMaxSize { get; set; }
-    internal int _commandRedoHistoryMaxSize { get; set; }
+    // ──────────────────────────────────────────────
+    //  Public API — Execute & Query
+    // ──────────────────────────────────────────────
 
-    // TODO these could be replaced with a max sized stack
-    internal readonly List<ICommand> _commandHistory;
-    internal readonly List<ICommand> _redoHistory;
-
-    private ICommandHandler GetCommandHandlerFor<TResponse>(ICommand<TResponse> command)
+    /// <inheritdoc />
+    public async Task<ICommandResponse<TResponse>> SendAsync<TResponse>(ICommand<TResponse> command)
     {
-        var commandHandlerType = typeof(ICommandHandler<,>).MakeGenericType(command.GetType(), typeof(TResponse));
+        ArgumentNullException.ThrowIfNull(command);
 
-        var handler = _serviceProvider.GetService(commandHandlerType) as ICommandHandler;
-
-        if (handler == null)
-        {
-            throw new NotImplementedException($"Missing command handler for {command.GetType().FullName}.");
-        }
-
-        return handler;
-    }
-
-    private IQueryHandler GetQueryHandlerFor<TResponse>(IQuery<TResponse> query)
-    {
-        var queryHandlerType = typeof(IQueryHandler<,>).MakeGenericType(query.GetType(), typeof(TResponse));
-
-        var handler = _serviceProvider.GetService(queryHandlerType) as IQueryHandler;
-
-        if (handler == null)
-        {
-            throw new NotImplementedException($"Missing query handler for {query.GetType().FullName}.");
-        }
-
-        return handler;
-    }
-
-    // <inheritdoc />
-    public async Task<ICommandResponse<TResponse>> Execute<TResponse>(ICommand<TResponse> command, Func<RequestStatus, bool>? shouldAddCommandToHistory = null)
-    {
         var handler = GetCommandHandlerFor(command);
+        var response = await handler.ExecuteAsync(command);
 
-        var response = await handler.Execute(command);
-
-        if (shouldAddCommandToHistory != null && shouldAddCommandToHistory(response.Status))
+        if (response.Status == RequestStatus.Success)
         {
             AddCommandToHistory(command);
         }
+
         return (ICommandResponse<TResponse>)response;
     }
 
-
-    // <inheritdoc />
-    public async Task<IQueryResponse<TResponse>> Execute<TResponse>(IQuery<TResponse> query)
+    /// <inheritdoc />
+    public async Task<ICommandResponse<TSubResponse>> SendAsSubCommandAsync<TSubResponse>(ICommand<TSubResponse> subCommand, ICommand parentCommand)
     {
+        ArgumentNullException.ThrowIfNull(subCommand);
+        ArgumentNullException.ThrowIfNull(parentCommand);
+
+        if (parentCommand is not ISubCommandHost host)
+        {
+            throw new ArgumentException($"Parent command of type {parentCommand.GetType().FullName} does not implement {nameof(ISubCommandHost)}. Only commands deriving from {nameof(CommandBase)} support sub-commands.", nameof(parentCommand));
+        }
+
+        var result = await SendAsync(subCommand);
+        host.AddSubCommand(subCommand);
+        return result;
+    }
+
+    /// <inheritdoc />
+    public async Task<IQueryResponse<TResponse>> QueryAsync<TResponse>(IQuery<TResponse> query)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
         var handler = GetQueryHandlerFor(query);
-        return (await handler.Execute(query)) as IQueryResponse<TResponse>;
+        return (IQueryResponse<TResponse>)await handler.ExecuteAsync(query);
     }
 
-    // <inheritdoc />
-    public void Undo(ICommand command)
+    // ──────────────────────────────────────────────
+    //  Public API — Undo & Redo
+    // ──────────────────────────────────────────────
+
+    /// <inheritdoc />
+    public async Task<bool> UndoLastCommandAsync()
     {
-        ICommandHandler? handler = null;
-
-        foreach (var interfaceType in command.GetType().GetInterfaces())
-        {
-            if (interfaceType.GetGenericTypeDefinition() == typeof(ICommand<>))
-            {
-                var methodInfo = GetPrivateMethodByReflection<Mediator>(nameof(GetCommandHandlerFor), 1, interfaceType.GenericTypeArguments[0]);
-                try
-                {
-                    handler = methodInfo.Invoke(this, new object[] { command }) as ICommandHandler;
-                }
-                catch (TargetInvocationException e)
-                {
-                    throw e.InnerException ?? e;
-                }
-                break;
-            }
-        }
-        if (handler == null)
-        {
-            throw new NotImplementedException($"Could not find a handler for command of type {command.GetType().FullName}");
-        }
-
-        handler.Undo(command);
-    }
-
-    // <inheritdoc />
-    public bool UndoLastCommand()
-    {
-        if (_commandHistory.Count == 0)
+        if (CommandHistory.Count == 0)
         {
             return false;
         }
 
-        var lastCommand = _commandHistory.Last();
+        var lastCommand = CommandHistory.Last!.Value;
 
-        Undo(lastCommand);
+        await DispatchUndoAsync(lastCommand);
 
-        _commandHistory.Remove(lastCommand);
-        _redoHistory.Add(lastCommand);
+        CommandHistory.RemoveLast();
+        RedoHistory.AddLast(lastCommand);
         return true;
     }
 
-    // <inheritdoc />
-    public async Task Redo(ICommand command)
+    /// <inheritdoc />
+    public async Task<bool> RedoLastUndoneCommandAsync()
     {
-        ICommandHandler? handler = null;
-
-        foreach (var interfaceType in command.GetType().GetInterfaces())
-        {
-            if (interfaceType.GetGenericTypeDefinition() == typeof(ICommand<>))
-            {
-                var methodInfo = GetPrivateMethodByReflection<Mediator>(nameof(GetCommandHandlerFor), 1, interfaceType.GenericTypeArguments[0]);
-                try
-                {
-                    handler = methodInfo.Invoke(this, new object[] { command }) as ICommandHandler;
-                }
-                catch (TargetInvocationException e)
-                {
-                    throw e.InnerException ?? e;
-                }
-                break;
-            }
-        }
-        if (handler == null)
-        {
-            throw new NotImplementedException($"Could not find a handler for command of type {command.GetType().FullName}");
-        }
-
-        await handler.Redo(command);
-    }
-
-    // <inheritdoc />
-    public async Task<bool> RedoLastUndoneCommand()
-    {
-        if (_redoHistory.Count == 0) 
+        if (RedoHistory.Count == 0) 
         {
             return false;
         }
 
-        var lastCommandUndone = _redoHistory.Last();
+        var lastCommandUndone = RedoHistory.Last!.Value;
 
-        await Redo(lastCommandUndone);
+        await DispatchRedoAsync(lastCommandUndone);
 
         MoveLastCommandFromRedoHistoryToHistory();
-        
         return true;
     }
+
+    // ──────────────────────────────────────────────
+    //  Internal dispatch — used by the public API above
+    //  and by CommandHandlerBase for sub-command propagation
+    // ──────────────────────────────────────────────
+
+    /// <summary>
+    ///     Resolves the handler for <paramref name="command"/> and calls its UndoAsync.
+    /// </summary>
+    private async Task DispatchUndoAsync(ICommand command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        var handler = GetCommandHandlerForUntyped(command);
+        await handler.UndoAsync(command);
+    }
+
+    /// <summary>
+    ///     Resolves the handler for <paramref name="command"/> and calls its RedoAsync.
+    /// </summary>
+    private async Task DispatchRedoAsync(ICommand command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        var handler = GetCommandHandlerForUntyped(command);
+        await handler.RedoAsync(command);
+    }
+
+    // Explicit interface — delegates to the private methods above.
+    async Task ISubCommandDispatcher.UndoAsync(ICommand command) => await DispatchUndoAsync(command);
+    async Task ISubCommandDispatcher.RedoAsync(ICommand command) => await DispatchRedoAsync(command);
+
+    // ──────────────────────────────────────────────
+    //  History management
+    // ──────────────────────────────────────────────
 
     private void AddCommandToHistory(ICommand command)
     {
-        if (_commandHistory.Count == _commandHistoryMaxSize)
+        if (CommandHistory.Count == CommandHistoryMaxSize)
         {
-            _commandHistory.Remove(_commandHistory.First());
+            CommandHistory.RemoveFirst();
         }
 
-        _commandHistory.Add(command);
-        _redoHistory.Clear();
+        CommandHistory.AddLast(command);
+        RedoHistory.Clear();
     }
 
     private void MoveLastCommandFromRedoHistoryToHistory()
     {
-        if (_redoHistory.Count == 0)
+        if (RedoHistory.Count == 0)
         {
             return;
         }
-        var command = _redoHistory.Last();
-        _redoHistory.Remove(command);
-        _commandHistory.Add(command);
-    }
 
-    public int HistoryLength => _commandHistory.Count;
+        var command = RedoHistory.Last!.Value;
+        RedoHistory.RemoveLast();
 
-    public int RedoHistoryLength => _redoHistory.Count;
-
-    // TODO These methods could be moved in another class.
-    private MethodInfo GetClosedGenericMethod(MethodInfo baseMethod, Type type1)
-    {
-        return baseMethod.MakeGenericMethod(type1);
-    }
-
-    private MethodInfo GetClosedGenericMethod(MethodInfo baseMethod, Type type1, Type? type2 = null)
-    {
-        if (type2 == null)
+        if (CommandHistory.Count == CommandHistoryMaxSize)
         {
-            return GetClosedGenericMethod(baseMethod, type1);
+            CommandHistory.RemoveFirst();
         }
-        return baseMethod.MakeGenericMethod(type1, type2);
+
+        CommandHistory.AddLast(command);
     }
 
-    private MethodInfo GetPrivateMethodByReflection<TClass>(string methodName, int genericArguments, Type type1, Type? type2 = null)
+    // ──────────────────────────────────────────────
+    //  Handler resolution (with caching)
+    // ──────────────────────────────────────────────
+
+    private readonly ConcurrentDictionary<(Type OpenHandler, Type Request, Type Response), Type> _handlerTypeCache = new();
+    private readonly ConcurrentDictionary<Type, MethodInfo> _untypedMethodCache = new();
+
+    private THandler ResolveHandler<THandler>(Type openHandlerType, Type requestType, Type responseType, string requestKind) where THandler : class
     {
-        var baseMethod = typeof(TClass).GetMethods(BindingFlags.NonPublic | BindingFlags.Instance).First(x => x.Name == methodName && x.GetGenericArguments().Length == genericArguments);
-        return GetClosedGenericMethod(baseMethod, type1, type2);
+        var closedHandlerType = _handlerTypeCache.GetOrAdd(
+            (openHandlerType, requestType, responseType),
+            key => key.OpenHandler.MakeGenericType(key.Request, key.Response));
+
+        return _serviceProvider.GetService(closedHandlerType) as THandler
+            ?? throw new NotImplementedException($"Missing {requestKind} handler for {requestType.FullName}.");
+    }
+
+    private ICommandHandler GetCommandHandlerFor<TResponse>(ICommand<TResponse> command)
+    {
+        return ResolveHandler<ICommandHandler>(typeof(ICommandHandler<,>), command.GetType(), typeof(TResponse), "command");
+    }
+
+    private IQueryHandler GetQueryHandlerFor<TResponse>(IQuery<TResponse> query)
+    {
+        return ResolveHandler<IQueryHandler>(typeof(IQueryHandler<,>), query.GetType(), typeof(TResponse), "query");
+    }
+
+    /// <summary>
+    ///     Resolves a command handler when only the non-generic <see cref="ICommand"/> is available
+    ///     (i.e. during undo/redo where the TResponse is not known at compile time).
+    /// </summary>
+    private ICommandHandler GetCommandHandlerForUntyped(ICommand command)
+    {
+        var responseType = ReflectionHelper.GetGenericInterfaceArgument(command.GetType(), typeof(ICommand<>))
+            ?? throw new NotImplementedException($"Could not find a handler for command of type {command.GetType().FullName}");
+
+        var method = _untypedMethodCache.GetOrAdd(
+            responseType,
+            rt => ReflectionHelper.GetClosedPrivateMethod<Mediator>(nameof(GetCommandHandlerFor), 1, rt));
+
+        return ReflectionHelper.InvokeUnwrapped(method, this, command) as ICommandHandler
+            ?? throw new NotImplementedException($"Missing command handler for {command.GetType().FullName}.");
     }
 }

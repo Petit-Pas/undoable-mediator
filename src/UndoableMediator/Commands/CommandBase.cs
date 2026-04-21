@@ -1,6 +1,4 @@
-﻿using UndoableMediator.Mediators;
-
-namespace UndoableMediator.Commands;
+﻿namespace UndoableMediator.Commands;
 
 /// <summary>
 ///     The base class to use for a command that returns nothing.
@@ -10,23 +8,25 @@ public abstract class CommandBase : CommandBase<NoResponse>
 }
 
 /// <summary>
-///     The base class to use for a command that returns something
+///     The base class to use for a command that returns something.
 /// </summary>
 /// <typeparam name="TResponse"> The type of the response from the command </typeparam>
-public abstract class CommandBase<TResponse> : ICommand<TResponse>
+public abstract class CommandBase<TResponse> : ICommand<TResponse>, ISubCommandHost
 {
-    // <inheritdoc />
-    public void AddToSubCommands(CommandBase command)
+    private readonly Stack<ICommand> _subCommands = new();
+
+    Stack<ICommand> ISubCommandHost.SubCommands
     {
-        SubCommands.Push(command);
+        get { return _subCommands; }
     }
 
-    public void ExecuteSubCommand(IUndoableMediator mediator, CommandBase command)
+    void ISubCommandHost.AddSubCommand(ICommand command)
     {
-        mediator.Execute(command);
-        AddToSubCommands(command);
+        _subCommands.Push(command);
     }
 
-    // <inheritdoc />
-    public Stack<CommandBase> SubCommands { get; set; } = new ();
+    void ISubCommandHost.ClearSubCommands()
+    {
+        _subCommands.Clear();
+    }
 }

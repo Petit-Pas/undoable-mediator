@@ -9,7 +9,7 @@ public class ChangeNameCommandHandler : CommandHandlerBase<ChangeNameCommand>
     {
     }
 
-    public override Task<ICommandResponse<NoResponse>> Execute(ChangeNameCommand command)
+    public override Task<ICommandResponse<NoResponse>> ExecuteAsync(ChangeNameCommand command)
     {
         command.OldName = AffectedObject.Name;
         AffectedObject.Name = command.NewName;
@@ -17,16 +17,17 @@ public class ChangeNameCommandHandler : CommandHandlerBase<ChangeNameCommand>
         return Task.FromResult(CommandResponse.Success());
     }
     
-    public override void Undo(ChangeNameCommand command)
+    public override async Task UndoAsync(ChangeNameCommand command)
     {
+        await base.UndoAsync(command);
         if (command.OldName != null)
         {
             AffectedObject.Name = command.OldName;
         }
     }
 
-    public override async Task Redo(ChangeNameCommand command)
+    public override async Task RedoAsync(ChangeNameCommand command)
     {
-        await Execute(command);
+        await ExecuteAsync(command);
     }
 }

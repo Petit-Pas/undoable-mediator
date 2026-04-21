@@ -11,34 +11,30 @@ namespace UndoableMediator.Samples.Controllers
     {
         private readonly ILogger<TestController> _logger;
         private readonly IUndoableMediator _mediator;
-        private readonly IServiceProvider _serviceCollection;
-        private readonly IServiceProvider _serviceProvider;
 
-        public TestController(ILogger<TestController> logger, IUndoableMediator mediator,
-            IServiceProvider serviceProvider)
+        public TestController(ILogger<TestController> logger, IUndoableMediator mediator)
         {
             _logger = logger;
             _mediator = mediator;
-            _serviceProvider = serviceProvider;
         }
 
         [HttpGet]
         [Route("getRandomInt")]
         public async Task<ActionResult<int>> GetInt()
         {
-            var command = new RandomIntQuery();
-            var result = await _mediator.Execute(command);
+            var query = new RandomIntQuery();
+            var result = await _mediator.QueryAsync(query);
 
             return Ok(result.Response);
         }
 
         [HttpGet]
         [Route("setDefinedInt")]
-        public ActionResult SetInt()
+        public async Task<ActionResult> SetInt()
         {
             var command = new ChangeAgeCommand(25);
 
-            _mediator.Execute(command);
+            await _mediator.SendAsync(command);
 
             return Ok();
         }
@@ -49,10 +45,10 @@ namespace UndoableMediator.Samples.Controllers
         {
             var command = new SetRandomAgeCommand();
 
-            var result = await _mediator.Execute(command, IUndoableMediator.AddAlways);
-            _mediator.UndoLastCommand();
+            var result = await _mediator.SendAsync(command);
+            await _mediator.UndoLastCommandAsync();
 
-            _mediator.RedoLastUndoneCommand();
+            await _mediator.RedoLastUndoneCommandAsync();
 
             return Ok(result.Response);
         }

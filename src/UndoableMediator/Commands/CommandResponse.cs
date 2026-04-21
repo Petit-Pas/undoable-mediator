@@ -7,12 +7,10 @@ namespace UndoableMediator.Commands;
 ///     Generic class for command responses
 /// </summary>
 /// <typeparam name="TResponse"> The type of the response </typeparam>
-public class CommandResponse<TResponse> : ICommandResponse<TResponse>
+public class CommandResponse<TResponse> : ResponseBase<TResponse>, ICommandResponse<TResponse>
 {
-    internal CommandResponse(TResponse? response, RequestStatus status)
+    internal CommandResponse(TResponse? response, RequestStatus status) : base(response, status)
     {
-        Response = response;
-        Status = status;
     }
 
     public CommandResponse(ICommandResponse commandResponse) : this(default, commandResponse.Status)
@@ -22,12 +20,6 @@ public class CommandResponse<TResponse> : ICommandResponse<TResponse>
     public CommandResponse(IQueryResponse commandResponse) : this(default, commandResponse.Status)
     {
     }
-
-    // <inheritdoc />
-    public TResponse? Response { get; }
-
-    // <inheritdoc />
-    public RequestStatus Status { get; }
 }
 
 /// <summary>
@@ -53,7 +45,7 @@ public class CommandResponse : CommandResponse<NoResponse>
     /// </summary>
     /// <typeparam name="TContent"> Type expected as answer from the command </typeparam>
     /// <param name="response"> Answer of the command, 'default' by default </param>
-    /// <returns> The build QueryResponse </returns>
+    /// <returns> The built CommandResponse </returns>
     public static ICommandResponse<TContent> Canceled<TContent>(TContent? response = default)
     {
         return new CommandResponse<TContent>(response, RequestStatus.Canceled);
@@ -64,7 +56,7 @@ public class CommandResponse : CommandResponse<NoResponse>
     /// </summary>
     /// <typeparam name="TContent"> Type expected as answer from the command </typeparam>
     /// <param name="response"> Answer of the command, 'default' by default </param>
-    /// <returns> The build QueryResponse </returns>
+    /// <returns> The built CommandResponse </returns>
     public static ICommandResponse<TContent> Success<TContent>(TContent? response = default)
     {
         return new CommandResponse<TContent>(response, RequestStatus.Success);
@@ -75,7 +67,7 @@ public class CommandResponse : CommandResponse<NoResponse>
     /// </summary>
     /// <typeparam name="TContent"> Type expected as answer from the command </typeparam>
     /// <param name="response"> Answer of the command, 'default' by default </param>
-    /// <returns> The build QueryResponse </returns>
+    /// <returns> The built CommandResponse </returns>
     public static ICommandResponse<TContent> Failed<TContent>(TContent? response = default)
     {
         return new CommandResponse<TContent>(response, RequestStatus.Failed);
@@ -84,7 +76,7 @@ public class CommandResponse : CommandResponse<NoResponse>
     /// <summary>
     ///     Creates a CommandResponse with a status of Canceled and a content of NoAnswer
     /// </summary>
-    /// <returns> The build QueryResponse </returns>
+    /// <returns> The built CommandResponse </returns>
     public static ICommandResponse<NoResponse> Canceled()
     {
         return new CommandResponse(RequestStatus.Canceled);
@@ -93,7 +85,7 @@ public class CommandResponse : CommandResponse<NoResponse>
     /// <summary>
     ///     Creates a CommandResponse with a status of Success and a content of NoAnswer
     /// </summary>
-    /// <returns> The build QueryResponse </returns>
+    /// <returns> The built CommandResponse </returns>
     public static ICommandResponse<NoResponse> Success()
     {
         return new CommandResponse(RequestStatus.Success);
@@ -102,7 +94,7 @@ public class CommandResponse : CommandResponse<NoResponse>
     /// <summary>
     ///     Creates a CommandResponse with a status of Failed and a content of NoAnswer
     /// </summary>
-    /// <returns> The build QueryResponse </returns>
+    /// <returns> The built CommandResponse </returns>
     public static ICommandResponse<NoResponse> Failed()
     {
         return new CommandResponse(RequestStatus.Failed);

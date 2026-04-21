@@ -13,21 +13,31 @@ public interface ICommandHandler<TCommand, TResponse> : ICommandHandler
     /// </summary>
     /// <param name="command"> The command to execute </param>
     /// <returns> The command response </returns>
-    Task<ICommandResponse<TResponse>> Execute(TCommand command);
+    Task<ICommandResponse<TResponse>> ExecuteAsync(TCommand command);
 
     /// <summary>
-    ///     This is the actual Undo method that does the job, by default it only propagates to subcommands.
-    ///     Can be overridden to add some more comportments, should be the case if the command actually modified the state of anything.
+    ///     Undoes the command. The default implementation in <see cref="CommandHandlerBase{TCommand,TResponse}"/>
+    ///     propagates undo to all sub-commands in reverse execution order.
+    ///     <para>
+    ///         If you override this method, you <b>must</b> either call <c>base.UndoAsync(command)</c>
+    ///         to preserve automatic sub-command propagation, or handle sub-commands manually.
+    ///     </para>
     /// </summary>
     /// <param name="command"> The command to undo </param>
-    void Undo(TCommand command);
+    Task UndoAsync(TCommand command);
     
     /// <summary>
-    ///     This is the actual Redo method that does the job, by default it only propagates to subcommands.
-    ///     Can be overridden to add some more comportments, should be the case if the command actually modifies the state of anything.
+    ///     Redoes the command. The default implementation in <see cref="CommandHandlerBase{TCommand,TResponse}"/>
+    ///     propagates redo to all sub-commands in original execution order.
+    ///     <para>
+    ///         If you override this method, you <b>must</b> either call <c>base.RedoAsync(command)</c>
+    ///         to preserve automatic sub-command propagation, or handle sub-commands manually.
+    ///         You may also call <c>ClearSubCommands(command)</c> followed by <c>ExecuteAsync(command)</c>
+    ///         to re-execute from scratch instead of replaying recorded sub-commands.
+    ///     </para>
     /// </summary>
     /// <param name="command"> The command to redo </param>
-    Task Redo(TCommand command);
+    Task RedoAsync(TCommand command);
 }
 
 /// <summary>
@@ -36,24 +46,24 @@ public interface ICommandHandler<TCommand, TResponse> : ICommandHandler
 public interface ICommandHandler
 {
     /// <summary>
-    ///     Generic method, will be called first, then specialize into the other "Execute()"
+    ///     Generic method, will be called first, then specialize into the typed overload.
     /// </summary>
     /// <param name="command"> The command to execute </param>
-    /// <returns> The response of the command, can be casted into ICommandResponse<TResponse> </returns>
+    /// <returns> The response of the command, can be cast to ICommandResponse&lt;TResponse&gt; </returns>
     /// <exception cref="InvalidOperationException"> Should never be thrown, unless being called wrongly by something else than the mediator </exception>
-    Task<ICommandResponse> Execute(ICommand command);
+    Task<ICommandResponse> ExecuteAsync(ICommand command);
 
     /// <summary>
-    ///     Generic method, will be called first, then specialize into the other "Undo()"
+    ///     Generic method, will be called first, then specialize into the typed overload.
     /// </summary>
     /// <param name="command"> The command to undo </param>
     /// <exception cref="InvalidOperationException"> Should never be thrown, unless being called wrongly by something else than the mediator </exception>
-    void Undo(ICommand command);
+    Task UndoAsync(ICommand command);
 
     /// <summary>
-    ///     Generic method, will be called first, then specialize into the other "Redo()"
+    ///     Generic method, will be called first, then specialize into the typed overload.
     /// </summary>
     /// <param name="command"> The command to redo </param>
     /// <exception cref="InvalidOperationException"> Should never be thrown, unless being called wrongly by something else than the mediator </exception>
-    Task Redo(ICommand command);
+    Task RedoAsync(ICommand command);
 }

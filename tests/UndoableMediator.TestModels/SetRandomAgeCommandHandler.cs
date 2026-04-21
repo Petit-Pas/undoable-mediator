@@ -9,14 +9,10 @@ public class SetRandomAgeCommandHandler : CommandHandlerBase<SetRandomAgeCommand
     {
     }
 
-    public override async Task<ICommandResponse<int>> Execute(SetRandomAgeCommand command)
+    public override async Task<ICommandResponse<int>> ExecuteAsync(SetRandomAgeCommand command)
     {
-        var randomAgeQuery = new RandomIntQuery();
-        var age = await _mediator.Execute(randomAgeQuery);
-        var changeAgeCommand = new ChangeAgeCommand(age?.Response ?? 0);
-        await _mediator.Execute(changeAgeCommand);
-        command.AddToSubCommands(changeAgeCommand);
-
+        var age = await _mediator.QueryAsync(new RandomIntQuery());
+        await _mediator.SendAsSubCommandAsync(new ChangeAgeCommand(age?.Response ?? 0), command);
         return CommandResponse.Success(age?.Response ?? 0);
     }
 }

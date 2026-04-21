@@ -4,7 +4,7 @@ namespace UndoableMediator.TestModels;
 
 public class CancelableQueryHandler : QueryHandlerBase<CancelableQuery, bool>
 {
-    public override Task<IQueryResponse<bool>> Execute(CancelableQuery query)
+    public override Task<IQueryResponse<bool>> ExecuteAsync(CancelableQuery query)
     {
         return Task.FromResult(query.ShouldBeCanceled ? QueryResponse<bool>.Canceled(false) : QueryResponse<bool>.Success(true));
     }

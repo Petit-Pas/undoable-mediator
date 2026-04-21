@@ -1,4 +1,6 @@
-﻿namespace UndoableMediator.Queries;
+﻿using UndoableMediator.Requests;
+
+namespace UndoableMediator.Queries;
 
 /// <summary>
 ///     Base class to inherit from when implementing the handler for a query
@@ -8,16 +10,13 @@
 public abstract class QueryHandlerBase<TQuery, TResponse> : IQueryHandler<TQuery, TResponse>
     where TQuery : class, IQuery<TResponse>
 {
-    // <inheritdoc />
-    public abstract Task<IQueryResponse<TResponse>> Execute(TQuery query);
+    /// <inheritdoc />
+    public abstract Task<IQueryResponse<TResponse>> ExecuteAsync(TQuery query);
 
-    // <inheritdoc />
-    public async Task<IQueryResponse> Execute(IQuery query)
+    /// <inheritdoc />
+    public async Task<IQueryResponse> ExecuteAsync(IQuery query)
     {
-        if (query is TQuery castedCommand)
-        {
-            return await Execute(castedCommand);
-        }
-        throw new InvalidOperationException($"Cannot execute query of type {query.GetType().FullName} because it is not of type {typeof(TQuery).FullName}");
+        var castedQuery = RequestCastHelper.CastOrThrow<TQuery>(query, "execute");
+        return await ExecuteAsync(castedQuery);
     }
 }

@@ -9,7 +9,7 @@ public class ChangeAgeCommandHandler : CommandHandlerBase<ChangeAgeCommand>
     {
     }
 
-    public override Task<ICommandResponse<NoResponse>> Execute(ChangeAgeCommand command)
+    public override Task<ICommandResponse<NoResponse>> ExecuteAsync(ChangeAgeCommand command)
     {
         command.OldAge = AffectedObject.Age;
         AffectedObject.Age = command.NewAge;
@@ -17,14 +17,14 @@ public class ChangeAgeCommandHandler : CommandHandlerBase<ChangeAgeCommand>
         return Task.FromResult(CommandResponse.Success());
     }
 
-    public override void Undo(ChangeAgeCommand command)
+    public override async Task UndoAsync(ChangeAgeCommand command)
     {
-        base.Undo(command);
+        await base.UndoAsync(command);
         AffectedObject.Age = command.OldAge;
     }
 
-    public override async Task Redo(ChangeAgeCommand command)
+    public override async Task RedoAsync(ChangeAgeCommand command)
     {
-        await Execute(command);
+        await ExecuteAsync(command);
     }
 }
