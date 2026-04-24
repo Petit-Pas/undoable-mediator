@@ -7,7 +7,7 @@ namespace UndoableMediator.Mediators;
 ///     to propagate undo and redo operations to sub-commands.
 ///     Not part of the public API — do not depend on this interface in application code.
 /// </summary>
-internal interface ISubCommandDispatcher
+public interface ISubCommandDispatcher
 {
     /// <summary>
     ///     Undoes the given command by dispatching to its handler.
