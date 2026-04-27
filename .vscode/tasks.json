@@ -1,0 +1,61 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Check git diff stat",
+			"type": "shell",
+			"command": "cd 'd:\\Code\\Perso\\undoable-mediator' && git diff --stat HEAD"
+		},
+		{
+			"label": "Check git diff stat tail",
+			"type": "shell",
+			"command": "cd 'd:\\Code\\Perso\\undoable-mediator' && git diff --stat HEAD 2>&1 | Select-Object -Last 30"
+		},
+		{
+			"label": "Diff IUndoableMediator",
+			"type": "shell",
+			"command": "cd 'd:\\Code\\Perso\\undoable-mediator' && git diff HEAD -- src/UndoableMediator/Mediators/IUndoableMediator.cs"
+		},
+		{
+			"label": "Diff IUndoableMediator full",
+			"type": "shell",
+			"command": "cd 'd:\\Code\\Perso\\undoable-mediator' && git diff HEAD -- src/UndoableMediator/Mediators/IUndoableMediator.cs 2>&1 | Out-String"
+		},
+		{
+			"label": "Run CommandLifecycleEvent Tests",
+			"type": "shell",
+			"command": "dotnet test tests/UndoableMediator.Tests/UndoableMediator.Tests.csproj --filter \"FullyQualifiedName~CommandLifecycleEventTests\" --logger \"console;verbosity=normal\"",
+			"group": "test"
+		},
+		{
+			"label": "Run CommandLifecycleEvent Tests 2",
+			"type": "shell",
+			"command": "dotnet test tests/UndoableMediator.Tests/UndoableMediator.Tests.csproj --filter \"FullyQualifiedName~CommandLifecycleEventTests\"",
+			"group": "test"
+		},
+		{
+			"label": "Run CommandLifecycleEvent Tests 3",
+			"type": "shell",
+			"command": "dotnet test tests/UndoableMediator.Tests/UndoableMediator.Tests.csproj --filter \"FullyQualifiedName~CommandLifecycleEventTests\"",
+			"group": "test"
+		},
+		{
+			"label": "Run CommandLifecycleEvent Tests 4",
+			"type": "shell",
+			"command": "dotnet test tests/UndoableMediator.Tests/UndoableMediator.Tests.csproj --filter \"FullyQualifiedName~CommandLifecycleEventTests\"",
+			"group": "test"
+		},
+		{
+			"label": "Run All Tests",
+			"type": "shell",
+			"command": "dotnet test tests/UndoableMediator.Tests/UndoableMediator.Tests.csproj",
+			"group": "test"
+		},
+		{
+			"label": "Run All Tests 2",
+			"type": "shell",
+			"command": "dotnet test tests/UndoableMediator.Tests/UndoableMediator.Tests.csproj",
+			"group": "test"
+		}
+	]
+}

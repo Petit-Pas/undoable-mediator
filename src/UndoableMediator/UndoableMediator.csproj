@@ -8,7 +8,7 @@
 		<IsPublishable>True</IsPublishable>
 		<IsPackable>True</IsPackable>
 		<PackageId>$(AssemblyName)</PackageId>
-		<Version>2.0.0-alpha2</Version>
+		<Version>2.0.0-alpha3</Version>
 		<Company>None</Company>
 		<Authors>benoit_hoffman</Authors>
 		<Description>

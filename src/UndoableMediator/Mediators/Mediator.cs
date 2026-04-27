@@ -22,6 +22,10 @@ public class Mediator : IUndoableMediator, ISubCommandDispatcher
     public int HistoryLength => CommandHistory.Count;
     public int RedoHistoryLength => RedoHistory.Count;
 
+    public event EventHandler<ICommand>? OnCommandExecuted;
+    public event EventHandler<ICommand>? OnCommandUndone;
+    public event EventHandler<ICommand>? OnCommandRedone;
+
     public Mediator(ILogger<IUndoableMediator> logger, IServiceProvider serviceProvider, UndoableMediatorOptions options)
     {
         _logger = logger;
@@ -43,12 +47,12 @@ public class Mediator : IUndoableMediator, ISubCommandDispatcher
     {
         ArgumentNullException.ThrowIfNull(command);
 
-        var handler = GetCommandHandlerFor(command);
-        var response = await handler.ExecuteAsync(command);
+        var response = await ExecuteCommandCoreAsync(command);
 
         if (response.Status == RequestStatus.Success)
         {
             AddCommandToHistory(command);
+            OnCommandExecuted?.Invoke(this, command);
         }
 
         return (ICommandResponse<TResponse>)response;
@@ -65,9 +69,19 @@ public class Mediator : IUndoableMediator, ISubCommandDispatcher
             throw new ArgumentException($"Parent command of type {parentCommand.GetType().FullName} does not implement {nameof(ISubCommandHost)}. Only commands deriving from {nameof(CommandBase)} support sub-commands.", nameof(parentCommand));
         }
 
-        var result = await SendAsync(subCommand);
+        var result = await ExecuteCommandCoreAsync(subCommand);
         host.AddSubCommand(subCommand);
-        return result;
+        return (ICommandResponse<TSubResponse>)result;
+    }
+
+    /// <summary>
+    ///     Executes a command via its handler and returns the response.
+    ///     Does <b>not</b> add to history or raise lifecycle events — callers are responsible for that.
+    /// </summary>
+    private async Task<ICommandResponse> ExecuteCommandCoreAsync<TResponse>(ICommand<TResponse> command)
+    {
+        var handler = GetCommandHandlerFor(command);
+        return await handler.ExecuteAsync(command);
     }
 
     /// <inheritdoc />
@@ -97,6 +111,7 @@ public class Mediator : IUndoableMediator, ISubCommandDispatcher
 
         CommandHistory.RemoveLast();
         RedoHistory.AddLast(lastCommand);
+        OnCommandUndone?.Invoke(this, lastCommand);
         return true;
     }
 
@@ -113,6 +128,7 @@ public class Mediator : IUndoableMediator, ISubCommandDispatcher
         await DispatchRedoAsync(lastCommandUndone);
 
         MoveLastCommandFromRedoHistoryToHistory();
+        OnCommandRedone?.Invoke(this, lastCommandUndone);
         return true;
     }
 

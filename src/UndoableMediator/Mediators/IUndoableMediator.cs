@@ -64,4 +64,22 @@ public interface IUndoableMediator
     /// </summary>
     public int RedoHistoryLength { get; }
 
+    /// <summary>
+    ///     Fired after a top-level command (sent via <see cref="SendAsync{TResponse}"/>) is successfully executed and added to the undo history.
+    ///     Not fired for sub-commands dispatched via <see cref="SendAsSubCommandAsync{TSubResponse}"/>.
+    /// </summary>
+    event EventHandler<ICommand>? OnCommandExecuted;
+
+    /// <summary>
+    ///     Fired after <see cref="UndoLastCommandAsync"/> successfully undoes a command.
+    ///     The event argument is the command that was undone.
+    /// </summary>
+    event EventHandler<ICommand>? OnCommandUndone;
+
+    /// <summary>
+    ///     Fired after <see cref="RedoLastUndoneCommandAsync"/> successfully redoes a command.
+    ///     The event argument is the command that was redone.
+    /// </summary>
+    event EventHandler<ICommand>? OnCommandRedone;
+
 }
